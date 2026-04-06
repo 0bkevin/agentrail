@@ -5,10 +5,11 @@ export async function POST(request: Request) {
     address?: string;
     message?: string;
     signature?: `0x${string}`;
+    challengeToken?: string;
   };
 
-  if (!body.address || !body.message || !body.signature) {
-    return Response.json({ error: "address, message, and signature are required." }, { status: 400 });
+  if (!body.address || !body.message || !body.signature || !body.challengeToken) {
+    return Response.json({ error: "address, message, signature, and challengeToken are required." }, { status: 400 });
   }
 
   try {
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
       address: body.address,
       message: body.message,
       signature: body.signature,
+      challengeToken: body.challengeToken,
     });
     await setSessionCookie(sessionToken);
 

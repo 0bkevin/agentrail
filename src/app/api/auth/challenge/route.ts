@@ -7,7 +7,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    return Response.json(buildChallenge(body.address));
+    const challenge = await buildChallenge(body.address);
+    return Response.json(challenge);
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Could not create challenge." },

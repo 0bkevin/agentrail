@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Joyride, type EventData, type Step } from "react-joyride";
 import { usePathname, useRouter } from "next/navigation";
+import { useAppKitAccount } from "@reown/appkit/react";
 
 const TUTORIAL_ROUTES = [
   { path: "/buyer", label: "Buyer" },
@@ -13,6 +14,8 @@ const TUTORIAL_ROUTES = [
 
 const TUTORIAL_DISABLED_KEY = "agentrail:tutorial:disabled";
 const TUTORIAL_PANEL_OPEN_KEY = "agentrail:tutorial:panel-open";
+const TUTORIAL_MASTER_AUTOSTARTED_KEY = "agentrail:tutorial:master:auto-started";
+const TUTORIAL_NUDGE_DISMISSED_KEY = "agentrail:tutorial:nudge-dismissed";
 
 function seenKey(path: string) {
   return `agentrail:tutorial:seen:${path}`;
@@ -23,12 +26,12 @@ function stepsFor(pathname: string): Step[] {
     return [
       {
         target: "#tour-nav-role-links",
-        content: "You can switch roles at any time. We start with Buyer because it initiates each order.",
+        content: "Switch roles at any time. This walkthrough starts in Buyer, then covers Provider, Operator, and Arbiter end-to-end.",
         skipBeacon: true,
       },
       {
         target: "#tour-wallet-auth",
-        content: "Connect and authenticate wallet first. Protected actions are signature-gated.",
+        content: "You are authenticated. Protected actions are signature-gated and tied to the active wallet identity.",
       },
       {
         target: "#tour-buyer-prompt",
@@ -36,7 +39,7 @@ function stepsFor(pathname: string): Step[] {
       },
       {
         target: "#tour-orders-queue",
-        content: "After funding, track lifecycle states here and decide whether to approve early settlement or dispute.",
+        content: "After funding, track lifecycle states here and decide to approve early settlement or open a dispute.",
       },
     ];
   }
@@ -54,7 +57,7 @@ function stepsFor(pathname: string): Step[] {
       },
       {
         target: "#tour-order-actions",
-        content: "Provider actions are enabled only in valid states to prevent invalid transitions.",
+        content: "Actions unlock by order state. As Provider, accept funded work, post stake, then submit signed proofs.",
       },
     ];
   }
@@ -72,7 +75,7 @@ function stepsFor(pathname: string): Step[] {
       },
       {
         target: "#tour-order-actions",
-        content: "Use these actions to move fulfillment to finality or escalation paths.",
+        content: "Use these controls to open challenge windows, settle valid orders, or escalate suspicious outcomes.",
       },
     ];
   }
@@ -90,7 +93,7 @@ function stepsFor(pathname: string): Step[] {
       },
       {
         target: "#tour-resolve-buyer",
-        content: "Resolve in buyer favor to refund payment and apply configured provider slash.",
+        content: "Resolve in buyer favor to refund payment and apply configured provider slash. This closes the full lifecycle.",
       },
     ];
   }
@@ -101,12 +104,69 @@ function stepsFor(pathname: string): Step[] {
 export function InteractiveTutorial() {
   const router = useRouter();
   const pathname = usePathname();
+  const { address, isConnected } = useAppKitAccount();
   const steps = useMemo(() => stepsFor(pathname), [pathname]);
   const [run, setRun] = useState(false);
   const [masterActive, setMasterActive] = useState(false);
   const [progressVersion, setProgressVersion] = useState(0);
   const [tutorialDisabled, setTutorialDisabled] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [showFirstRunNudge, setShowFirstRunNudge] = useState(false);
+  const [sessionAddress, setSessionAddress] = useState<string | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+
+  const connectedAddress = (isConnected && address ? address : null) as `0x${string}` | null;
+  const isAppTutorialRoute = TUTORIAL_ROUTES.some((route) => route.path === pathname);
+
+  useEffect(() => {
+    let active = true;
+
+    async function syncSession() {
+      if (!connectedAddress) {
+        if (!active) return;
+        setSessionAddress(null);
+        setSessionLoading(false);
+        return;
+      }
+
+      setSessionLoading(true);
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        const json = (await response.json()) as { authenticated?: boolean; address?: string | null };
+
+        if (!active) return;
+        if (response.ok && json.authenticated && json.address) {
+          setSessionAddress(json.address);
+        } else {
+          setSessionAddress(null);
+        }
+      } catch {
+        if (active) {
+          setSessionAddress(null);
+        }
+      } finally {
+        if (active) {
+          setSessionLoading(false);
+        }
+      }
+    }
+
+    void syncSession();
+
+    const handleAuthChange = () => {
+      void syncSession();
+    };
+
+    window.addEventListener("auth-change", handleAuthChange as EventListener);
+    return () => {
+      active = false;
+      window.removeEventListener("auth-change", handleAuthChange as EventListener);
+    };
+  }, [connectedAddress]);
+
+  const isAuthenticated = Boolean(
+    connectedAddress && sessionAddress && connectedAddress.toLowerCase() === sessionAddress.toLowerCase(),
+  );
 
   const progress = useMemo(() => {
     if (typeof window === "undefined") {
@@ -131,15 +191,31 @@ export function InteractiveTutorial() {
   }, [pathname]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     if (tutorialDisabled) return;
     if (!steps.length) return;
-    const hasSeen = window.localStorage.getItem(seenKey(pathname));
-    const shouldAutoRun = pathname === "/buyer";
-    if (((!hasSeen && shouldAutoRun) || masterActive) && !run) {
+    if (masterActive && !run) {
       const timer = window.setTimeout(() => setRun(true), 350);
       return () => window.clearTimeout(timer);
     }
-  }, [pathname, steps.length, masterActive, tutorialDisabled, run]);
+  }, [isAuthenticated, pathname, steps.length, masterActive, tutorialDisabled, run]);
+
+  useEffect(() => {
+    if (!isAuthenticated || tutorialDisabled) return;
+
+    const alreadyAutoStarted = window.localStorage.getItem(TUTORIAL_MASTER_AUTOSTARTED_KEY) === "1";
+    const hasSeenAny = TUTORIAL_ROUTES.some((route) => window.localStorage.getItem(seenKey(route.path)) === "1");
+    const nudgeDismissed = window.localStorage.getItem(TUTORIAL_NUDGE_DISMISSED_KEY) === "1";
+
+    if (!alreadyAutoStarted && !hasSeenAny && !nudgeDismissed) {
+      window.localStorage.setItem(TUTORIAL_MASTER_AUTOSTARTED_KEY, "1");
+      setPanel(true);
+      setShowFirstRunNudge(true);
+      return;
+    }
+
+    setShowFirstRunNudge(false);
+  }, [isAuthenticated, tutorialDisabled]);
 
   function resetTutorialProgress() {
     for (const route of TUTORIAL_ROUTES) {
@@ -152,9 +228,11 @@ export function InteractiveTutorial() {
     resetTutorialProgress();
     window.localStorage.setItem("agentrail:tutorial:master", "1");
     window.localStorage.setItem("agentrail:tutorial:master:index", "0");
+    window.localStorage.removeItem(TUTORIAL_NUDGE_DISMISSED_KEY);
     window.localStorage.removeItem(TUTORIAL_DISABLED_KEY);
     setMasterActive(true);
     setTutorialDisabled(false);
+    setShowFirstRunNudge(false);
     setRun(false);
     if (pathname !== "/buyer") {
       router.push("/buyer");
@@ -182,18 +260,37 @@ export function InteractiveTutorial() {
   function disableTutorialsCompletely() {
     stopMasterTour();
     window.localStorage.setItem(TUTORIAL_DISABLED_KEY, "1");
+    window.localStorage.setItem(TUTORIAL_NUDGE_DISMISSED_KEY, "1");
     setTutorialDisabled(true);
+    setShowFirstRunNudge(false);
     setPanel(false);
   }
 
   function enableTutorials() {
     window.localStorage.removeItem(TUTORIAL_DISABLED_KEY);
+    window.localStorage.removeItem(TUTORIAL_NUDGE_DISMISSED_KEY);
     setTutorialDisabled(false);
+    setShowFirstRunNudge(false);
     setPanel(true);
   }
 
+  function dismissFirstRunNudge() {
+    window.localStorage.setItem(TUTORIAL_NUDGE_DISMISSED_KEY, "1");
+    setShowFirstRunNudge(false);
+  }
+
   function onEvent(data: EventData) {
-    const finished = data.status === "finished" || data.status === "skipped";
+    const finished = data.status === "finished";
+    const skipped = data.status === "skipped";
+
+    if (skipped) {
+      setRun(false);
+      if (masterActive) {
+        stopMasterTour();
+      }
+      return;
+    }
+
     if (finished) {
       window.localStorage.setItem(seenKey(pathname), "1");
       setProgressVersion((prev) => prev + 1);
@@ -216,6 +313,9 @@ export function InteractiveTutorial() {
   }
 
   if (pathname === "/") return null;
+  if (!isAppTutorialRoute) return null;
+  if (sessionLoading) return null;
+  if (!isAuthenticated) return null;
   if (!steps.length && tutorialDisabled) return null;
 
   return (
@@ -264,6 +364,29 @@ export function InteractiveTutorial() {
       {panelOpen && (
         <section className="fixed bottom-16 left-4 z-[9998] w-[min(92vw,340px)] border-2 border-brut-red bg-black/95 p-4 text-white shadow-[6px_6px_0px_0px_var(--brut-red)]">
           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-brut-red">Tutorial Progress</p>
+          {showFirstRunNudge && !tutorialDisabled && (
+            <div className="mt-3 border border-brut-red bg-brut-red/10 p-3">
+              <p className="text-[11px] font-mono uppercase text-white/90">
+                New here? Start a guided 4-role walkthrough to learn the full order lifecycle.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={beginMasterTour}
+                  className="flex-1 border border-brut-red bg-brut-red px-2 py-1 text-[10px] font-black uppercase tracking-widest text-black hover:bg-white"
+                >
+                  Start Tour
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissFirstRunNudge}
+                  className="flex-1 border border-brut-red bg-black px-2 py-1 text-[10px] font-black uppercase tracking-widest text-brut-red hover:bg-brut-red hover:text-black"
+                >
+                  Not Now
+                </button>
+              </div>
+            </div>
+          )}
           <p className="mt-2 text-sm font-bold uppercase">
             {completedCount}/{TUTORIAL_ROUTES.length} routes completed
           </p>

@@ -1,22 +1,34 @@
 # AgentRail MVP
 
-AgentRail is an autonomous commerce settlement rail for AI agents and IoT devices. This app implements escrowed service orders, provider collateral, signed fulfillment proofs, optimistic challenge windows, and dispute fallback.
+AgentRail is a settlement rail for autonomous services: an AI agent (buyer) can pay an API/IoT/human provider only when verifiable work is delivered.
 
-Agent request planning uses the DigitalOcean Gradient SDK-compatible chat completion API (with deterministic fallback heuristics if API credentials are absent).
+In plain terms, AgentRail does three things:
+- locks buyer funds in escrow,
+- requires cryptographically signed fulfillment proof,
+- resolves outcomes via optimistic challenge + dispute fallback.
 
-## Implemented Scope
+This repository includes a full Sepolia demo stack: smart contracts, role-based web app, proof services, and Neon persistence.
 
-- Flow A: paid API provider fulfillment with signed proof.
-- Flow B: IoT device simulator fulfillment with signed proof.
-- Flow C: human task provider path (same escrow lifecycle, stretch flow).
-- Wallet auth with Reown AppKit + signed session.
-- On-chain lifecycle on Ethereum Sepolia via `AgentRailEscrow`.
-- Provider registry contract support via `ProviderRegistry`.
-- Neon/Postgres persistence for orders/proofs/disputes/audit.
-- Event sync worker with log-level idempotency keys.
-- Dedicated proof verifier service boundary.
-- Buyer early settlement approval before challenge deadline.
-- Configurable partial slashing for buyer-win dispute resolution.
+## Why this exists
+
+Autonomous systems need trust-minimized payment rails. Traditional API billing assumes platform trust; AgentRail enforces settlement rules onchain:
+- provider posts stake,
+- provider submits proof hash,
+- verifier opens challenge window,
+- funds settle automatically if unchallenged,
+- arbiter resolves disputes when needed.
+
+## How it works
+
+1. Buyer requests service and funds an escrow order.
+2. Provider accepts and posts collateral.
+3. Provider returns signed proof payload (API/IoT/human flow).
+4. Proof verifier validates payload + signature.
+5. Contract enters challenge window.
+6. Final outcome:
+   - early buyer approval, or
+   - settle after window closes, or
+   - dispute then arbiter resolution.
 
 ## Architecture
 
@@ -27,68 +39,106 @@ Buyer UI / Agent
 Next.js Dashboard + API  <---->  Provider API / Device Sim / Proof Verifier
     |                                        |
     v                                        v
-Postgres (Neon)                        Signed proof payloads
+Neon/Postgres                         Signed proof payloads
     |
     v
 AgentRailEscrow + ProviderRegistry (Ethereum Sepolia)
 ```
 
-## Smart Contracts
+## Core components
 
 - `contracts/AgentRailEscrow.sol`
-  - create, accept, submit proof hash, start challenge, dispute, settle, resolve, cancel
-  - buyer early settlement approval: `approveEarlySettlement`
-  - configurable buyer-win slash basis points: `setProviderSlashBpsOnBuyerWin`
+  - order lifecycle: `create`, `accept`, `submitFulfillment`, `startChallengeWindow`, `dispute`, `settle`, `resolve`, `cancel`
+  - early settlement approval and configurable slashing
+  - exact-token receipt checks for safer ERC20 accounting
 - `contracts/ProviderRegistry.sol`
-  - provider wallet + device signer + service mask + metadata
+  - onchain provider metadata: wallet, device signer, service mask, metadata URI
+- `src/app/*`
+  - role dashboards: buyer, provider, operator, arbiter
+- `services/*`
+  - `provider-api.ts` (`:4101`), `device-sim.ts` (`:4102`), `proof-verifier.ts` (`:4103`), `human-solver.ts` (`:4104`)
+- `src/lib/storage.ts`
+  - Neon-backed persistence for orders, audits, proofs, disputes, sessions
+- `scripts/sync-escrow-events.ts`
+  - chain event sync with idempotent ingestion
 
-## Services
+## Supported flows
 
-- `services/provider-api.ts` on `:4101`
-- `services/device-sim.ts` on `:4102`
-- `services/proof-verifier.ts` on `:4103`
-- `services/human-solver.ts` on `:4104`
-- `services/sync-worker.ts` (polling chain event sync)
+- Paid API fulfillment with signed proof
+- IoT action fulfillment with device-signed proof
+- Human-task fulfillment with signed result package
 
-## Required Environment
+## Quick start
 
-Copy `.env.example` to `.env.local` and fill values.
-
-Important vars:
-
-- `SEPOLIA_RPC_URL`
-- `DEPLOYER_PRIVATE_KEY`
-- `NEXT_PUBLIC_AGENTRAIL_ESCROW_ADDRESS`
-- `NEXT_PUBLIC_MOCK_USDC_ADDRESS`
-- `PROVIDER_REGISTRY_ADDRESS` and/or `NEXT_PUBLIC_PROVIDER_REGISTRY_ADDRESS`
-- `AGENTRAIL_OPERATOR_ADDRESS`
-- `AGENTRAIL_OPERATOR_PRIVATE_KEY`
-- `AGENTRAIL_ARBITER_ADDRESS`
-- `DATABASE_URL` or `NEON_DATABASE_URL`
-- `PROVIDER_API_PRIVATE_KEY`
-- `DEVICE_SIM_PRIVATE_KEY`
-- `NEXT_PUBLIC_PROVIDER_API_URL`
-- `NEXT_PUBLIC_DEVICE_SIM_URL`
-- `NEXT_PUBLIC_PROOF_VERIFIER_URL`
-- `NEXT_PUBLIC_HUMAN_SOLVER_URL`
-- `GRADIENT_API_KEY`
-- `GRADIENT_BASE_URL` (default `https://api.gradient.ai/api`)
-- `GRADIENT_MODEL`
-
-Optional:
-
-- `AGENTRAIL_CHALLENGE_WINDOW_SECONDS` (default 120)
-- `AGENTRAIL_AUTOSTART_CHALLENGE` (default true)
-- `AGENTRAIL_AUTOSETTLE_ENABLED` (default true)
-- `ESCROW_SYNC_INTERVAL_MS` (default 10000)
-
-## Install
+1) Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-## Contract Commands
+Generate contract artifacts (required before app build if `artifacts/` is not present):
+
+```bash
+pnpm contracts:compile
+```
+
+2) Configure environment:
+
+```bash
+cp .env.example .env.local
+```
+
+3) Start demo stack:
+
+```bash
+pnpm demo:up
+```
+
+4) Open dashboards:
+- `/buyer`
+- `/provider`
+- `/operator`
+- `/arbiter`
+
+Reset demo/offchain state between runs:
+
+```bash
+pnpm demo:reset
+```
+
+## Environment variables
+
+Required (minimum meaningful setup):
+
+- Chain + deploy
+  - `SEPOLIA_RPC_URL`
+  - `DEPLOYER_PRIVATE_KEY`
+  - `NEXT_PUBLIC_AGENTRAIL_ESCROW_ADDRESS`
+  - `NEXT_PUBLIC_MOCK_USDC_ADDRESS`
+  - `PROVIDER_REGISTRY_ADDRESS` and/or `NEXT_PUBLIC_PROVIDER_REGISTRY_ADDRESS`
+- Roles
+  - `AGENTRAIL_OPERATOR_ADDRESS`
+  - `AGENTRAIL_OPERATOR_PRIVATE_KEY`
+  - `AGENTRAIL_ARBITER_ADDRESS`
+- Database
+  - `DATABASE_URL` or `NEON_DATABASE_URL`
+- Service signers + service URLs
+  - `PROVIDER_API_PRIVATE_KEY`
+  - `DEVICE_SIM_PRIVATE_KEY`
+  - `HUMAN_SOLVER_PRIVATE_KEY`
+  - `NEXT_PUBLIC_PROVIDER_API_URL`
+  - `NEXT_PUBLIC_DEVICE_SIM_URL`
+  - `NEXT_PUBLIC_PROOF_VERIFIER_URL`
+  - `NEXT_PUBLIC_HUMAN_SOLVER_URL`
+
+Optional:
+- `GRADIENT_API_KEY`, `GRADIENT_BASE_URL`, `GRADIENT_MODEL`
+- `AGENTRAIL_CHALLENGE_WINDOW_SECONDS` (default `120`)
+- `AGENTRAIL_AUTOSTART_CHALLENGE` (default `true`)
+- `AGENTRAIL_AUTOSETTLE_ENABLED` (default `true`)
+- `ESCROW_SYNC_INTERVAL_MS` (default `10000`)
+
+## Smart contract commands
 
 Compile + test:
 
@@ -97,7 +147,7 @@ pnpm contracts:compile
 pnpm contracts:test
 ```
 
-Deploy escrow + token:
+Deploy escrow + mock token:
 
 ```bash
 pnpm contracts:deploy:sepolia
@@ -115,60 +165,22 @@ Configure verifier/resolver roles:
 pnpm contracts:configure:roles:sepolia
 ```
 
-## Run Locally
+## Service commands (manual mode)
 
-Fastest demo startup:
-
-```bash
-pnpm demo:up
-```
-
-Reset all off-chain demo state (orders, proposals, terminal logs, proofs/disputes/audit rows, auth sessions, sync cursors, local artifacts):
-
-```bash
-pnpm demo:reset
-```
-
-Then rerun `pnpm demo:up`.
-
-Terminal 1:
+If you do not use `pnpm demo:up`, run components manually:
 
 ```bash
 pnpm dev
-```
-
-Terminal 2:
-
-```bash
 pnpm service:provider-api
-```
-
-Terminal 3:
-
-```bash
 pnpm service:device-sim
-```
-
-Terminal 4:
-
-```bash
 pnpm service:proof-verifier
-```
-
-Terminal 5:
-
-```bash
+pnpm service:human-solver
 pnpm worker:sync
 ```
 
-Terminal 6:
+## API surface
 
-```bash
-pnpm service:human-solver
-```
-
-## API Endpoints
-
+App API:
 - `POST /api/agent/request-service`
 - `POST /api/orders/quote`
 - `POST /api/orders`
@@ -177,72 +189,22 @@ pnpm service:human-solver
 - `GET /api/orders/:id`
 - `POST /api/sync/escrow-events`
 
-Service endpoints:
-
+Service API:
 - `POST /v1/company-enrichment` (provider API)
 - `POST /device/execute` (device simulator)
 - `POST /v1/verify-and-start` (proof verifier)
 - `POST /v1/human-task` (human solver)
 
-## MVP Freeze Checklist
+## Source of truth and data model
 
-- Freeze feature scope: no additional architecture changes.
-- Keep demo to 2 flows only:
-  - Happy path: fund -> accept -> proof -> verifier -> settle.
-  - Dispute path: fund -> accept -> proof -> dispute -> arbiter resolve.
-- Use one startup command: `pnpm demo:up`.
-- Before each rehearsal/demo run: `pnpm demo:reset`.
+- Contract state and emitted events are the settlement source of truth.
+- Neon stores operational state for UX, orchestration, auditability, and sessions.
+- Event sync deduplicates by transaction log identity to avoid double-processing.
 
-## Demo Script (4-6 Minutes)
+## Demo narrative (4-6 min)
 
-1. Setup (30s)
-   - Show `/buyer` and connected authenticated wallet.
-   - Mention escrow and challenge-based settlement model.
-2. Happy path (2m)
-   - Generate proposal from buyer prompt.
-   - Approve proposal to fund escrow.
-   - Switch to provider route and accept/stake.
-   - Submit proof (provider API or IoT).
-   - Show verifier/challenge start and settlement transition.
-3. Dispute path (2m)
-   - Create second order.
-   - Accept and submit proof.
-   - Open dispute from buyer/operator.
-   - Resolve on `/arbiter` (provider wins or buyer refunded).
-4. Close (30s)
-   - Show timeline + tx hashes + terminal/audit indicators.
-   - Emphasize reusable rail for AI/API/IoT/human providers.
-
-## Rehearsal Timing Guidance
-
-- Target total runtime: 4-6 minutes.
-- Run 3 full rehearsals before live demo.
-- Keep one backup browser tab already authenticated.
-- If a step stalls, move to the next role route and continue the narrative.
-
-## Demo Flow
-
-1. Connect + authenticate wallet.
-2. Buyer creates proposal and funds order (on-chain create).
-3. Provider accepts (on-chain stake).
-4. Provider API or device simulator returns signed proof.
-5. Provider submits fulfillment hash on-chain.
-6. Proof verifier validates signature + payload and starts challenge window.
-7. Either:
-   - buyer approves early settlement, or
-   - no dispute until deadline then settle, or
-   - dispute and arbiter resolve.
-
-## Route-level Dashboards
-
-- Landing: `/`
-- Buyer: `/buyer`
-- Provider: `/provider`
-- Operator: `/operator`
-- Arbiter: `/arbiter`
-
-## Notes on Source of Truth
-
-- On-chain tx execution is primary for settlement actions.
-- Event sync ingests contract events and deduplicates by tx hash + log index.
-- Off-chain state is persisted for UX, audit logs, and service orchestration.
+1. Buyer creates and funds order.
+2. Provider accepts and submits proof.
+3. Operator/verifier opens challenge window.
+4. Show one happy-path settlement and one dispute resolution.
+5. Close with tx hashes + audit timeline.

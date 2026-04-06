@@ -113,6 +113,9 @@ export default function Home() {
             </p>
             
             <div className="flex flex-wrap justify-center gap-6">
+              <Link href="/demo" className="brutalist-button-secondary group-hover:bg-black group-hover:text-white group-hover:border-white">
+                Watch Demo
+              </Link>
               <Link href="/buyer" className="brutalist-button group-hover:bg-black group-hover:text-brut-red group-hover:border-black hover:!bg-white hover:!text-black">
                 Launch Dashboard [BUYER]
               </Link>

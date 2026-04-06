@@ -32,7 +32,7 @@ export default function Home() {
           <div className="absolute -left-full -right-full top-1/2 h-px bg-brut-red/30 -z-10 hidden md:block"></div>
           <div className="absolute left-1/2 top-0 bottom-0 w-px bg-brut-red/30 -z-10 hidden md:block"></div>
 
-          <div className="brutalist-container group hover:-translate-y-2 transition-transform duration-300">
+          <div id="tour-landing-what-is" className="brutalist-container group hover:-translate-y-2 transition-transform duration-300">
             <h2 className="text-3xl font-black text-brut-red uppercase tracking-tighter mb-6 group-hover:hover-glitch">What is AgentRail?</h2>
             <p className="text-white/80 font-mono leading-relaxed text-lg mb-6 uppercase">
               AgentRail is the missing layer for autonomous machine-to-machine commerce. 
@@ -65,7 +65,7 @@ export default function Home() {
         </section>
 
         {/* FEATURES MATRIX */}
-        <section className="space-y-12">
+        <section id="tour-landing-features" className="space-y-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b-4 border-brut-red pb-6">
             <div>
               <p className="text-brut-red font-black tracking-[0.3em] uppercase text-sm mb-2">SYSTEM_CAPABILITIES</p>
@@ -101,7 +101,7 @@ export default function Home() {
         </section>
 
         {/* TERMINAL ENTRY CTA */}
-        <section className="brutalist-container py-16 text-center flex flex-col items-center bg-[url('/scanline.png')] bg-cover relative group overflow-hidden">
+        <section id="tour-landing-cta" className="brutalist-container py-16 text-center flex flex-col items-center bg-[url('/scanline.png')] bg-cover relative group overflow-hidden">
           <div className="absolute inset-0 bg-brut-red transform translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.87,0,0.13,1)] z-0"></div>
           
           <div className="relative z-10 flex flex-col items-center group-hover:text-black transition-colors duration-500">

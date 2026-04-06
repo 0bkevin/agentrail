@@ -807,7 +807,7 @@ export function AgentRailShell({
       )}
 
       {role === "buyer" && (
-        <section className="brutalist-container !p-6">
+        <section id="tour-buyer-prompt" className="brutalist-container !p-6">
           <p className="text-xs font-black uppercase tracking-[0.3em] text-brut-red mb-4">AGENT_INTENT_PROMPT</p>
           <div className="space-y-4">
             <textarea
@@ -829,7 +829,7 @@ export function AgentRailShell({
       )}
 
       {role === "provider" && (
-        <section className="brutalist-container !p-6 flex flex-col gap-4 md:flex-row md:items-end justify-between">
+        <section id="tour-provider-identity" className="brutalist-container !p-6 flex flex-col gap-4 md:flex-row md:items-end justify-between">
           <div className="flex-1">
             <p className="text-xs font-black uppercase tracking-[0.3em] text-brut-red mb-4">ACTIVE_IDENTITY</p>
             <select
@@ -848,7 +848,7 @@ export function AgentRailShell({
       )}
 
       {role === "operator" && (
-        <section className="brutalist-container !p-6 flex flex-col gap-4 md:flex-row md:items-end justify-between">
+        <section id="tour-operator-filter" className="brutalist-container !p-6 flex flex-col gap-4 md:flex-row md:items-end justify-between">
           <div className="flex-1">
             <p className="text-xs font-black uppercase tracking-[0.3em] text-brut-red mb-4">STATE_FILTER</p>
             <select
@@ -879,7 +879,7 @@ export function AgentRailShell({
         />
       )}
 
-      <section className="mt-8">
+      <section id="tour-orders-queue" className="mt-8">
         <div className="flex items-center justify-between border-b-2 border-brut-accent pb-4 mb-6">
           <p className="text-xs font-black uppercase tracking-[0.3em] text-white/50">ACTIONABLE_ORDERS_QUEUE</p>
           <span className="text-brut-red font-mono font-bold text-xs">[{visibleOrders.length}_ITEMS]</span>
@@ -927,7 +927,7 @@ export function AgentRailShell({
                 </div>
 
                 {(canAccept || canProof || canStartChallenge || canBuyerDispute || canOperatorDispute || canCancel || canApproveEarly || canSettle || canResolve) && (
-                  <div className="flex flex-col gap-3 mt-2 border-t border-brut-accent pt-5">
+                  <div id="tour-order-actions" className="flex flex-col gap-3 mt-2 border-t border-brut-accent pt-5">
                     {canAccept && (
                       <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("accept", order.id, { role: "provider" })}>
                         ACCEPT_AND_STAKE
@@ -970,12 +970,16 @@ export function AgentRailShell({
                     )}
                     {canResolve && (
                       <div className="flex flex-col gap-3">
-                        <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("resolve", order.id, { role: "arbiter", providerWins: true })} tone="success">
-                          RESOLVE_PROVIDER_WINS
-                        </ActionButton>
-                        <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("resolve", order.id, { role: "arbiter", providerWins: false })} tone="danger">
-                          RESOLVE_BUYER_REFUNDED
-                        </ActionButton>
+                        <div id="tour-resolve-provider">
+                          <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("resolve", order.id, { role: "arbiter", providerWins: true })} tone="success">
+                            RESOLVE_PROVIDER_WINS
+                          </ActionButton>
+                        </div>
+                        <div id="tour-resolve-buyer">
+                          <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("resolve", order.id, { role: "arbiter", providerWins: false })} tone="danger">
+                            RESOLVE_BUYER_REFUNDED
+                          </ActionButton>
+                        </div>
                       </div>
                     )}
                   </div>

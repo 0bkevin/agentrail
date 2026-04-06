@@ -100,6 +100,11 @@ pnpm demo:up
 - `/operator`
 - `/arbiter`
 
+Tutorial UX:
+- Use `Open Guide` in the bottom-left to run route tutorials on demand.
+- Use `Start Master` for a full role-by-role walkthrough across the app.
+- Use `Disable All` if you want to completely turn tutorials off.
+
 Reset demo/offchain state between runs:
 
 ```bash

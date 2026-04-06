@@ -10,7 +10,7 @@ export function Navigation() {
 
   return (
     <nav className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
-      <Link href="/" className="px-3 py-1 text-sm font-black tracking-[0.3em] text-brut-red hover-glitch uppercase border border-transparent hover:border-brut-red transition-colors">
+      <Link id="tour-nav-brand" href="/" className="px-3 py-1 text-sm font-black tracking-[0.3em] text-brut-red hover-glitch uppercase border border-transparent hover:border-brut-red transition-colors">
         AGENTRAIL_SYS
       </Link>
       <div className="h-4 w-px bg-brut-accent mx-2 hidden sm:block"></div>
@@ -23,12 +23,16 @@ export function Navigation() {
         </div>
       ) : (
         <>
-          <Link href="/buyer" className={`px-3 py-1 text-xs font-bold uppercase tracking-widest transition-all border border-transparent hover:text-white hover:bg-brut-red hover:shadow-[4px_4px_0px_0px_var(--brut-accent)] ${pathname === "/buyer" ? "text-white bg-brut-red shadow-[4px_4px_0px_0px_var(--brut-accent)]" : "text-white/70"}`}>BUYER</Link>
-          <Link href="/provider" className={`px-3 py-1 text-xs font-bold uppercase tracking-widest transition-all border border-transparent hover:text-white hover:bg-brut-red hover:shadow-[4px_4px_0px_0px_var(--brut-accent)] ${pathname === "/provider" ? "text-white bg-brut-red shadow-[4px_4px_0px_0px_var(--brut-accent)]" : "text-white/70"}`}>PROVIDER</Link>
-          <Link href="/operator" className={`px-3 py-1 text-xs font-bold uppercase tracking-widest transition-all border border-transparent hover:text-white hover:bg-brut-red hover:shadow-[4px_4px_0px_0px_var(--brut-accent)] ${pathname === "/operator" ? "text-white bg-brut-red shadow-[4px_4px_0px_0px_var(--brut-accent)]" : "text-white/70"}`}>OPERATOR</Link>
-          <Link href="/arbiter" className={`px-3 py-1 text-xs font-bold uppercase tracking-widest transition-all border border-transparent hover:text-white hover:bg-brut-red hover:shadow-[4px_4px_0px_0px_var(--brut-accent)] ${pathname === "/arbiter" ? "text-white bg-brut-red shadow-[4px_4px_0px_0px_var(--brut-accent)]" : "text-white/70"}`}>ARBITER</Link>
+          <div id="tour-nav-role-links" className="contents">
+            <Link href="/buyer" className={`px-3 py-1 text-xs font-bold uppercase tracking-widest transition-all border border-transparent hover:text-white hover:bg-brut-red hover:shadow-[4px_4px_0px_0px_var(--brut-accent)] ${pathname === "/buyer" ? "text-white bg-brut-red shadow-[4px_4px_0px_0px_var(--brut-accent)]" : "text-white/70"}`}>BUYER</Link>
+            <Link href="/provider" className={`px-3 py-1 text-xs font-bold uppercase tracking-widest transition-all border border-transparent hover:text-white hover:bg-brut-red hover:shadow-[4px_4px_0px_0px_var(--brut-accent)] ${pathname === "/provider" ? "text-white bg-brut-red shadow-[4px_4px_0px_0px_var(--brut-accent)]" : "text-white/70"}`}>PROVIDER</Link>
+            <Link href="/operator" className={`px-3 py-1 text-xs font-bold uppercase tracking-widest transition-all border border-transparent hover:text-white hover:bg-brut-red hover:shadow-[4px_4px_0px_0px_var(--brut-accent)] ${pathname === "/operator" ? "text-white bg-brut-red shadow-[4px_4px_0px_0px_var(--brut-accent)]" : "text-white/70"}`}>OPERATOR</Link>
+            <Link href="/arbiter" className={`px-3 py-1 text-xs font-bold uppercase tracking-widest transition-all border border-transparent hover:text-white hover:bg-brut-red hover:shadow-[4px_4px_0px_0px_var(--brut-accent)] ${pathname === "/arbiter" ? "text-white bg-brut-red shadow-[4px_4px_0px_0px_var(--brut-accent)]" : "text-white/70"}`}>ARBITER</Link>
+          </div>
           <div className="ml-auto">
-            <WalletAuth />
+            <div id="tour-wallet-auth">
+              <WalletAuth />
+            </div>
           </div>
         </>
       )}

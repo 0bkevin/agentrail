@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 
 import { ReownProvider } from "@/components/reown-provider";
 import { Navigation } from "@/components/navigation";
+import { InteractiveTutorial } from "@/components/interactive-tutorial";
 
 import "./globals.css";
 
@@ -40,6 +41,7 @@ export default async function RootLayout({
           <header className="sticky top-0 z-40 border-b-2 border-brut-red bg-black/90 backdrop-blur shadow-[0px_4px_0px_0px_var(--brut-red)] mb-6">
             <Navigation />
           </header>
+          <InteractiveTutorial />
           {children}
         </ReownProvider>
       </body>

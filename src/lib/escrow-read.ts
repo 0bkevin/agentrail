@@ -1,15 +1,15 @@
 import { createPublicClient, http } from "viem";
-import { baseSepolia } from "viem/chains";
+import { sepolia } from "viem/chains";
 
 import { agentRailEscrowAbi, requireEscrowAddress } from "@/config/contracts";
 
 function rpcUrl() {
-  return process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org";
+  return process.env.SEPOLIA_RPC_URL || "https://rpc.sepolia.org";
 }
 
 function client() {
   return createPublicClient({
-    chain: baseSepolia,
+    chain: sepolia,
     transport: http(rpcUrl()),
   });
 }

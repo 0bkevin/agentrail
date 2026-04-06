@@ -5,7 +5,7 @@ import "@nomicfoundation/hardhat-toolbox";
 loadEnv();
 
 const privateKey = process.env.DEPLOYER_PRIVATE_KEY ?? process.env.PRIVATE_KEY;
-const basescanApiKey = process.env.BASESCAN_API_KEY ?? "";
+const etherscanApiKey = process.env.ETHERSCAN_API_KEY ?? "";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -20,15 +20,15 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {},
-    baseSepolia: {
-      url: process.env.BASE_SEPOLIA_RPC_URL ?? "https://sepolia.base.org",
-      chainId: 84532,
+    sepolia: {
+      url: process.env.SEPOLIA_RPC_URL ?? "https://rpc.sepolia.org",
+      chainId: 11155111,
       accounts: privateKey ? [privateKey] : [],
     },
   },
   etherscan: {
     apiKey: {
-      baseSepolia: basescanApiKey,
+      sepolia: etherscanApiKey,
     },
   },
   sourcify: {

@@ -1,6 +1,6 @@
 import { createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { baseSepolia } from "viem/chains";
+import { sepolia } from "viem/chains";
 
 import { transitionOrder } from "@/lib/agentrail-store";
 import type { Order } from "@/lib/agentrail-types";
@@ -16,7 +16,7 @@ function parseBoolean(value: string | undefined, defaultValue: boolean) {
 }
 
 function rpcUrl() {
-  return process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org";
+  return process.env.SEPOLIA_RPC_URL || "https://rpc.sepolia.org";
 }
 
 function challengeWindowSeconds() {
@@ -64,11 +64,11 @@ export async function orchestrateChallengeWindow(order: Order) {
 
   const walletClient = createWalletClient({
     account,
-    chain: baseSepolia,
+    chain: sepolia,
     transport: http(rpcUrl()),
   });
   const publicClient = createPublicClient({
-    chain: baseSepolia,
+    chain: sepolia,
     transport: http(rpcUrl()),
   });
 
@@ -125,11 +125,11 @@ export async function orchestrateAutoSettlement(order: Order) {
 
   const walletClient = createWalletClient({
     account,
-    chain: baseSepolia,
+    chain: sepolia,
     transport: http(rpcUrl()),
   });
   const publicClient = createPublicClient({
-    chain: baseSepolia,
+    chain: sepolia,
     transport: http(rpcUrl()),
   });
 

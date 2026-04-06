@@ -1,5 +1,5 @@
 import { createPublicClient, http, keccak256, stringToHex } from "viem";
-import { baseSepolia } from "viem/chains";
+import { sepolia } from "viem/chains";
 
 const providerRegistryAbi = [
   {
@@ -41,12 +41,12 @@ function registryAddress() {
 }
 
 function rpcUrl() {
-  return process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org";
+  return process.env.SEPOLIA_RPC_URL || "https://rpc.sepolia.org";
 }
 
 function client() {
   return createPublicClient({
-    chain: baseSepolia,
+    chain: sepolia,
     transport: http(rpcUrl()),
   });
 }

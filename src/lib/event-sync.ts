@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 import { createPublicClient, decodeEventLog, http } from "viem";
-import { baseSepolia } from "viem/chains";
+import { sepolia } from "viem/chains";
 
 import { agentRailEscrowAbi } from "@/config/contracts";
 import { getDashboardSnapshot } from "@/lib/agentrail-store";
 import type { Order } from "@/lib/agentrail-types";
 import { storage } from "@/lib/storage";
 
-const SYNC_CURSOR_KEY = "agentrail:base-sepolia:escrow-cursor";
+const SYNC_CURSOR_KEY = "agentrail:sepolia:escrow-cursor";
 const SYNC_WINDOW = BigInt(500);
 
 type EscrowEventName =
@@ -43,7 +43,7 @@ function mapOnchainOrderId(orderId: bigint) {
 }
 
 function getRpcUrl() {
-  return process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org";
+  return process.env.SEPOLIA_RPC_URL || "https://rpc.sepolia.org";
 }
 
 function getEscrowAddress() {
@@ -56,7 +56,7 @@ function getEscrowAddress() {
 
 function getPublicClient() {
   return createPublicClient({
-    chain: baseSepolia,
+    chain: sepolia,
     transport: http(getRpcUrl()),
   });
 }

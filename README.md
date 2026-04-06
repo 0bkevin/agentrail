@@ -10,7 +10,7 @@ Agent request planning uses the DigitalOcean Gradient SDK-compatible chat comple
 - Flow B: IoT device simulator fulfillment with signed proof.
 - Flow C: human task provider path (same escrow lifecycle, stretch flow).
 - Wallet auth with Reown AppKit + signed session.
-- On-chain lifecycle on Base Sepolia via `AgentRailEscrow`.
+- On-chain lifecycle on Ethereum Sepolia via `AgentRailEscrow`.
 - Provider registry contract support via `ProviderRegistry`.
 - Neon/Postgres persistence for orders/proofs/disputes/audit.
 - Event sync worker with log-level idempotency keys.
@@ -30,7 +30,7 @@ Next.js Dashboard + API  <---->  Provider API / Device Sim / Proof Verifier
 Postgres (Neon)                        Signed proof payloads
     |
     v
-AgentRailEscrow + ProviderRegistry (Base Sepolia)
+AgentRailEscrow + ProviderRegistry (Ethereum Sepolia)
 ```
 
 ## Smart Contracts
@@ -56,7 +56,7 @@ Copy `.env.example` to `.env.local` and fill values.
 
 Important vars:
 
-- `BASE_SEPOLIA_RPC_URL`
+- `SEPOLIA_RPC_URL`
 - `DEPLOYER_PRIVATE_KEY`
 - `NEXT_PUBLIC_AGENTRAIL_ESCROW_ADDRESS`
 - `NEXT_PUBLIC_MOCK_USDC_ADDRESS`
@@ -100,19 +100,19 @@ pnpm contracts:test
 Deploy escrow + token:
 
 ```bash
-pnpm contracts:deploy:base-sepolia
+pnpm contracts:deploy:sepolia
 ```
 
 Deploy provider registry:
 
 ```bash
-pnpm contracts:deploy:registry:base-sepolia
+pnpm contracts:deploy:registry:sepolia
 ```
 
 Configure verifier/resolver roles:
 
 ```bash
-pnpm contracts:configure:roles:base-sepolia
+pnpm contracts:configure:roles:sepolia
 ```
 
 ## Run Locally

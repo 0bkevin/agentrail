@@ -5,7 +5,6 @@ import { Joyride, type EventData, type Step } from "react-joyride";
 import { usePathname, useRouter } from "next/navigation";
 
 const TUTORIAL_ROUTES = [
-  { path: "/", label: "Landing" },
   { path: "/buyer", label: "Buyer" },
   { path: "/provider", label: "Provider" },
   { path: "/operator", label: "Operator" },
@@ -20,28 +19,6 @@ function seenKey(path: string) {
 }
 
 function stepsFor(pathname: string): Step[] {
-  if (pathname === "/") {
-    return [
-      {
-        target: "#tour-nav-brand",
-        content: "Welcome to AgentRail. This is your command hub for autonomous service settlement.",
-        skipBeacon: true,
-      },
-      {
-        target: "#tour-landing-what-is",
-        content: "Start here to understand the core value: pay only for verifiable work.",
-      },
-      {
-        target: "#tour-landing-features",
-        content: "These are the four core primitives: escrow, proof, challenge, and arbitration.",
-      },
-      {
-        target: "#tour-landing-cta",
-        content: "Enter the app from here. Then run route tutorials for Buyer, Provider, Operator, and Arbiter.",
-      },
-    ];
-  }
-
   if (pathname === "/buyer") {
     return [
       {
@@ -157,7 +134,7 @@ export function InteractiveTutorial() {
     if (tutorialDisabled) return;
     if (!steps.length) return;
     const hasSeen = window.localStorage.getItem(seenKey(pathname));
-    const shouldAutoRun = pathname === "/";
+    const shouldAutoRun = pathname === "/buyer";
     if (((!hasSeen && shouldAutoRun) || masterActive) && !run) {
       const timer = window.setTimeout(() => setRun(true), 350);
       return () => window.clearTimeout(timer);
@@ -179,8 +156,8 @@ export function InteractiveTutorial() {
     setMasterActive(true);
     setTutorialDisabled(false);
     setRun(false);
-    if (pathname !== "/") {
-      router.push("/");
+    if (pathname !== "/buyer") {
+      router.push("/buyer");
       return;
     }
     window.setTimeout(() => setRun(true), 250);
@@ -238,6 +215,7 @@ export function InteractiveTutorial() {
     }
   }
 
+  if (pathname === "/") return null;
   if (!steps.length && tutorialDisabled) return null;
 
   return (

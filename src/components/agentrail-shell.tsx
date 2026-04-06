@@ -121,19 +121,39 @@ function stableStringify(value: unknown): string {
 }
 
 function providerApiBase() {
-  return process.env.NEXT_PUBLIC_PROVIDER_API_URL || "http://localhost:4101";
+  return process.env.NEXT_PUBLIC_PROVIDER_API_URL || "";
 }
 
 function deviceSimBase() {
-  return process.env.NEXT_PUBLIC_DEVICE_SIM_URL || "http://localhost:4102";
+  return process.env.NEXT_PUBLIC_DEVICE_SIM_URL || "";
 }
 
 function proofVerifierBase() {
-  return process.env.NEXT_PUBLIC_PROOF_VERIFIER_URL || "http://localhost:4103";
+  return process.env.NEXT_PUBLIC_PROOF_VERIFIER_URL || "";
 }
 
 function humanSolverBase() {
-  return process.env.NEXT_PUBLIC_HUMAN_SOLVER_URL || "http://localhost:4104";
+  return process.env.NEXT_PUBLIC_HUMAN_SOLVER_URL || "";
+}
+
+function providerApiUrl() {
+  const base = providerApiBase();
+  return base ? `${base}/v1/company-enrichment` : "/api/provider/v1/company-enrichment";
+}
+
+function deviceSimUrl() {
+  const base = deviceSimBase();
+  return base ? `${base}/device/execute` : "/api/device/device/execute";
+}
+
+function humanSolverUrl() {
+  const base = humanSolverBase();
+  return base ? `${base}/v1/human-task` : "/api/human/v1/human-task";
+}
+
+function proofVerifierUrl() {
+  const base = proofVerifierBase();
+  return base ? `${base}/v1/verify-and-start` : "/api/verifier/v1/verify-and-start";
 }
 
 async function postExternalJson<T>(url: string, body: unknown) {
@@ -181,9 +201,9 @@ export function AgentRailShell({
   initialSnapshot: DashboardSnapshot;
   initialRole?: RoleTab;
 }) {
-    const { address, isConnected } = useAppKitAccount();
+  const { address, isConnected } = useAppKitAccount();
   const { caipNetwork } = useAppKitNetwork();
-    const { signMessageAsync } = useSignMessage();
+  const { signMessageAsync } = useSignMessage();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
 
@@ -196,13 +216,18 @@ export function AgentRailShell({
   const [operatorFilter, setOperatorFilter] = useState<OperatorFilter>("all");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const connectedAddress = (isConnected && address ? address : null) as `0x${string}` | null;
   const [sessionAddress, setSessionAddress] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
+  const [demoBypass, setDemoBypass] = useState(false);
+  const demoBypassEnabled = process.env.NEXT_PUBLIC_DEMO_BYPASS === "true" || demoBypass;
   const isOnSepolia = caipNetwork?.id === "eip155:11155111";
-  const isAuthenticated = Boolean(
-    connectedAddress && sessionAddress && connectedAddress.toLowerCase() === sessionAddress.toLowerCase(),
-  );
+
+  useEffect(() => {
+    const host = window.location.hostname;
+    const localHost = host === "localhost" || host === "127.0.0.1";
+    setDemoBypass(localHost && window.localStorage.getItem("agentrail:demo:bypass-wallet") === "1");
+  }, []);
+
   const hasContractConfig = Boolean(CONTRACTS.escrow && CONTRACTS.mockUsdc);
 
   const { data: nextOrderId } = useReadContract({
@@ -231,6 +256,18 @@ export function AgentRailShell({
     }
   }, [selectedOrderId]);
 
+  const runDemoAction = useCallback(
+    async (body: Record<string, unknown>) => {
+      const data = await postJson<{ order?: Order }>("/api/demo/drive", body);
+      await refresh();
+      if (data.order) {
+        setSelectedOrderId(data.order.id);
+      }
+      return data.order;
+    },
+    [refresh],
+  );
+
   useEffect(() => {
     const interval = window.setInterval(() => {
       void refresh();
@@ -244,6 +281,36 @@ export function AgentRailShell({
     setSessionAddress(json.authenticated ? json.address : null);
     return json;
   }, []);
+
+  const activeOrder = useMemo(() => {
+    if (!snapshot?.orders) return undefined;
+    return snapshot.orders.find((order) => order.id === selectedOrderId) ?? activeOrderFrom(snapshot);
+  }, [selectedOrderId, snapshot]);
+
+  const selectedProvider = useMemo(() => {
+    if (!snapshot?.providers) return undefined;
+    return snapshot.providers.find((provider) => provider.id === selectedProviderId) ?? snapshot.providers[0];
+  }, [selectedProviderId, snapshot]);
+
+  const demoRoleAddress = useMemo(() => {
+    if (role === "provider") {
+      return (selectedProvider?.walletAddress ?? snapshot.providers[0]?.walletAddress ?? null) as `0x${string}` | null;
+    }
+    if (role === "operator") {
+      return (process.env.NEXT_PUBLIC_AGENTRAIL_OPERATOR_ADDRESS ?? "0x549390539BE66EA6efb99A0bB74be87Aeac18372") as `0x${string}`;
+    }
+    if (role === "arbiter") {
+      return (process.env.NEXT_PUBLIC_AGENTRAIL_ARBITER_ADDRESS ?? "0x549390539BE66EA6efb99A0bB74be87Aeac18372") as `0x${string}`;
+    }
+    return "0x1111111111111111111111111111111111111111" as `0x${string}`;
+  }, [role, selectedProvider, snapshot.providers]);
+
+  const connectedAddress = ((isConnected && address ? address : null) ?? (demoBypassEnabled ? demoRoleAddress : null)) as
+    | `0x${string}`
+    | null;
+  const isAuthenticated = demoBypassEnabled
+    ? true
+    : Boolean(connectedAddress && sessionAddress && connectedAddress.toLowerCase() === sessionAddress.toLowerCase());
 
   useEffect(() => {
     if (!connectedAddress) {
@@ -269,16 +336,6 @@ export function AgentRailShell({
       window.removeEventListener("auth-change", handleAuthChange);
     };
   }, [connectedAddress, syncSession]);
-
-  const activeOrder = useMemo(() => {
-    if (!snapshot?.orders) return undefined;
-    return snapshot.orders.find((order) => order.id === selectedOrderId) ?? activeOrderFrom(snapshot);
-  }, [selectedOrderId, snapshot]);
-
-  const selectedProvider = useMemo(() => {
-    if (!snapshot?.providers) return undefined;
-    return snapshot.providers.find((provider) => provider.id === selectedProviderId) ?? snapshot.providers[0];
-  }, [selectedProviderId, snapshot]);
 
   const visibleOrders = useMemo(() => {
     if (!snapshot?.orders) return [];
@@ -323,6 +380,14 @@ export function AgentRailShell({
       void (async () => {
         try {
           setMessage(null);
+          if (demoBypassEnabled) {
+            const data = await postJson<{ proposal: AgentProposal }>("/api/demo/drive", {
+              action: "proposal",
+              prompt,
+            });
+            setProposal(data.proposal);
+            return;
+          }
           const data = await postJson<{ proposal: AgentProposal }>("/api/agent/request-service", { prompt });
           setProposal(data.proposal);
         } catch (error) {
@@ -346,6 +411,18 @@ export function AgentRailShell({
       void (async () => {
         try {
           setMessage(null);
+          if (demoBypassEnabled) {
+            const order = await runDemoAction({
+              action: "fund_order",
+              proposalId: proposal.id,
+            });
+            setProposal(null);
+            if (order) {
+              setSelectedOrderId(order.id);
+            }
+            return;
+          }
+
           if (!connectedAddress) {
             throw new Error("Wallet is not connected.");
           }
@@ -459,7 +536,7 @@ export function AgentRailShell({
                     payload: typeof payload;
                     signature: `0x${string}`;
                   };
-                }>(`${deviceSimBase()}/device/execute`, {
+                }>(deviceSimUrl(), {
                   orderId: order.id,
                   requestHash: order.requestHash,
                   deviceId: order.requestPayload.deviceId,
@@ -471,7 +548,7 @@ export function AgentRailShell({
                       payload: typeof payload;
                       signature: `0x${string}`;
                     };
-                  }>(`${humanSolverBase()}/v1/human-task`, {
+                  }>(humanSolverUrl(), {
                     orderId: order.id,
                     requestHash: order.requestHash,
                   })
@@ -480,7 +557,7 @@ export function AgentRailShell({
                       payload: typeof payload;
                       signature: `0x${string}`;
                     };
-                  }>(`${providerApiBase()}/v1/company-enrichment`, {
+                  }>(providerApiUrl(), {
                     orderId: order.id,
                     requestHash: order.requestHash,
                     company: order.requestPayload.target,
@@ -524,7 +601,7 @@ export function AgentRailShell({
 
           await postVerifierJson<{
             order: Order;
-          }>(`${proofVerifierBase()}/v1/verify-and-start`, {
+          }>(proofVerifierUrl(), {
             orderId: order.id,
             txHash: submitTx,
             proofSubmission: {
@@ -534,6 +611,14 @@ export function AgentRailShell({
           });
           await refresh();
         } catch (error) {
+          if (demoBypassEnabled) {
+            try {
+              await runDemoAction({ action: "submit_proof", orderId: order.id });
+              return;
+            } catch {
+              // fall through to error messaging
+            }
+          }
           setMessage(error instanceof Error ? error.message : "Could not submit proof.");
         }
       })();
@@ -550,6 +635,11 @@ export function AgentRailShell({
       void (async () => {
         try {
           setMessage(null);
+          if (demoBypassEnabled) {
+            await runDemoAction({ action: "dispute", orderId, role, reason });
+            return;
+          }
+
           if (!connectedAddress) {
             throw new Error("Wallet is not connected.");
           }
@@ -599,6 +689,26 @@ export function AgentRailShell({
       void (async () => {
         try {
           setMessage(null);
+          if (demoBypassEnabled) {
+            const demoActionMap: Record<TransitionAction, string> = {
+              accept: "accept",
+              submit_proof: "submit_proof",
+              start_challenge: "start_challenge",
+              approve_early: "approve_early",
+              dispute: "dispute",
+              settle: "settle",
+              resolve: "resolve",
+              cancel: "cancel",
+            };
+            await runDemoAction({
+              action: demoActionMap[action],
+              orderId,
+              providerWins: extras?.providerWins,
+              reason: extras?.reason,
+            });
+            return;
+          }
+
           if (!connectedAddress) {
             throw new Error("Wallet is not connected.");
           }
@@ -885,6 +995,21 @@ export function AgentRailShell({
           <span className="text-brut-red font-mono font-bold text-xs">[{visibleOrders.length}_ITEMS]</span>
         </div>
 
+        <div id="tour-order-actions" className="mb-6 border border-brut-accent bg-black/40 p-4 font-mono text-xs uppercase text-white/70">
+          Actions unlock per order state and your active role. Accept, submit proof, verify, settle, dispute, or arbitrate when conditions are met.
+        </div>
+
+        {role === "arbiter" && (
+          <div className="mb-6 grid gap-3 md:grid-cols-2 text-[11px] uppercase font-mono">
+            <div id="tour-resolve-provider" className="border border-emerald-300/40 bg-emerald-400/10 p-3 text-emerald-100">
+              Provider resolution path: release payout and return stake.
+            </div>
+            <div id="tour-resolve-buyer" className="border border-rose-300/40 bg-rose-400/10 p-3 text-rose-100">
+              Buyer resolution path: refund buyer and apply provider penalty.
+            </div>
+          </div>
+        )}
+
         <div className="grid gap-6 lg:grid-cols-2">
           {visibleOrders.length === 0 && (
             <div className="col-span-full brutalist-container !p-12 text-center text-white/30 font-mono text-xl animate-pulse">
@@ -927,7 +1052,7 @@ export function AgentRailShell({
                 </div>
 
                 {(canAccept || canProof || canStartChallenge || canBuyerDispute || canOperatorDispute || canCancel || canApproveEarly || canSettle || canResolve) && (
-                  <div id="tour-order-actions" className="flex flex-col gap-3 mt-2 border-t border-brut-accent pt-5">
+                  <div className="flex flex-col gap-3 mt-2 border-t border-brut-accent pt-5">
                     {canAccept && (
                       <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("accept", order.id, { role: "provider" })}>
                         ACCEPT_AND_STAKE
@@ -970,12 +1095,12 @@ export function AgentRailShell({
                     )}
                     {canResolve && (
                       <div className="flex flex-col gap-3">
-                        <div id="tour-resolve-provider">
+                        <div>
                           <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("resolve", order.id, { role: "arbiter", providerWins: true })} tone="success">
                             RESOLVE_PROVIDER_WINS
                           </ActionButton>
                         </div>
-                        <div id="tour-resolve-buyer">
+                        <div>
                           <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("resolve", order.id, { role: "arbiter", providerWins: false })} tone="danger">
                             RESOLVE_BUYER_REFUNDED
                           </ActionButton>

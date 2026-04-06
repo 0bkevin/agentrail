@@ -10,14 +10,23 @@ export function ProtectedRoute({ children, title }: { children: React.ReactNode;
   const { address, isConnected } = useAppKitAccount();
   const [sessionAddress, setSessionAddress] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
+  const [demoBypass, setDemoBypass] = useState(false);
   const { open } = useAppKit();
   const connectedAddress = (isConnected && address ? address : null) as `0x${string}` | null;
+  const demoBypassEnabled = process.env.NEXT_PUBLIC_DEMO_BYPASS === "true" || demoBypass;
+
+  useEffect(() => {
+    const host = window.location.hostname;
+    const localHost = host === "localhost" || host === "127.0.0.1";
+    const bypassEnabled = localHost && window.localStorage.getItem("agentrail:demo:bypass-wallet") === "1";
+    setDemoBypass(bypassEnabled);
+  }, []);
 
   useEffect(() => {
     let active = true;
 
     async function syncSession() {
-      if (!connectedAddress) {
+      if (!connectedAddress && !demoBypassEnabled) {
         if (!active) return;
         setSessionAddress(null);
         setSessionLoading(false);
@@ -50,9 +59,12 @@ export function ProtectedRoute({ children, title }: { children: React.ReactNode;
       active = false;
       window.removeEventListener("auth-change", handleAuthChange);
     };
-  }, [connectedAddress]);
+  }, [connectedAddress, demoBypassEnabled]);
 
   const isAuthenticated = useMemo(() => {
+    if (demoBypassEnabled) {
+      return true;
+    }
     if (!connectedAddress || !sessionAddress) {
       return false;
     }
@@ -67,7 +79,7 @@ export function ProtectedRoute({ children, title }: { children: React.ReactNode;
     );
   }
 
-  if (!isConnected || !isAuthenticated) {
+  if ((!isConnected && !demoBypassEnabled) || !isAuthenticated) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center p-8 border-2 border-brut-red bg-black shadow-[8px_8px_0px_0px_var(--brut-red)] relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(211,47,47,0.1)_50%,transparent_50%)] bg-[length:100%_4px] opacity-20"></div>

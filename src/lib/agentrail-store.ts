@@ -27,7 +27,7 @@ const providers: Provider[] = [
     onchainProviderId: "0x988fc6652a2cac8e8a76f4f72e584b16b03e18c6d97b9271368bd628e4d5d607",
     walletAddress: "0xc9C94744BEc22DDF156e4d0a7d6D0D39ad863d46",
     deviceSignerAddress: "0xc9C94744BEc22DDF156e4d0a7d6D0D39ad863d46",
-    apiBaseUrl: process.env.NEXT_PUBLIC_PROVIDER_API_URL || "http://localhost:4101",
+    apiBaseUrl: process.env.NEXT_PUBLIC_PROVIDER_API_URL || "/api/provider",
     devicePublicKey: "secp256k1:0xc9C94744BEc22DDF156e4d0a7d6D0D39ad863d46",
     reputationScore: 92,
     serviceTypes: ["paid_api"],
@@ -42,7 +42,7 @@ const providers: Provider[] = [
     onchainProviderId: "0x4641ff87b0a5881bf96e6bce6fa7e9f300c37d08515062ebee2024668626a603",
     walletAddress: "0xC84a9fC17BFBcf5385DD24092f61463DbDDe6eBF",
     deviceSignerAddress: "0xC84a9fC17BFBcf5385DD24092f61463DbDDe6eBF",
-    apiBaseUrl: process.env.NEXT_PUBLIC_DEVICE_SIM_URL || "http://localhost:4102",
+    apiBaseUrl: process.env.NEXT_PUBLIC_DEVICE_SIM_URL || "/api/device",
     devicePublicKey: "secp256k1:0xC84a9fC17BFBcf5385DD24092f61463DbDDe6eBF",
     reputationScore: 89,
     serviceTypes: ["iot_action"],
@@ -647,6 +647,7 @@ export async function transitionOrder(args: {
   proofSubmission?: ProofSubmission;
   txHash?: string;
   onchainOrderId?: string;
+  skipProofVerification?: boolean;
 }) {
   await ensureSeeded();
   const order = await orderById(args.orderId);
@@ -722,7 +723,7 @@ export async function transitionOrder(args: {
         throw new Error("Only accepted orders can submit proof.");
       }
 
-      if (!args.proofSubmission) {
+      if (!args.proofSubmission && !args.skipProofVerification) {
         throw new Error("Proof submission is required for submit_proof action.");
       }
 
@@ -737,15 +738,53 @@ export async function transitionOrder(args: {
         throw new Error("Connected wallet does not match the assigned provider wallet.");
       }
 
-      const expectedSigner =
-        args.proofSubmission.payload.kind === "iot" ? signingPolicy.deviceSigner : signingPolicy.providerWallet;
+      let verifiedProof:
+        | {
+            message: string;
+            signerAddress: string;
+            payload: ProofSubmission["payload"];
+          }
+        | undefined;
 
-      const verifiedProof = await verifyProofSubmission({
-        order,
-        submission: args.proofSubmission,
-        expectedSigner,
-        expectedDeviceId: order.serviceType === "iot_action" ? expectedDeviceId(order) : undefined,
-      });
+      if (args.skipProofVerification) {
+        const resultUri = `ipfs://agentrail/demo/${order.id}/${now()}`;
+        verifiedProof = {
+          message: `demo-proof:${order.id}`,
+          signerAddress: signingPolicy.providerWallet,
+          payload:
+            order.serviceType === "iot_action"
+              ? {
+                  kind: "iot",
+                  orderId: order.id,
+                  requestHash: order.requestHash,
+                  resultUri,
+                  responseHash: hashValue(`demo-proof:${order.id}`),
+                  timestamp: now(),
+                  deviceId: expectedDeviceId(order),
+                  actionType: order.requestPayload.action ?? "read-temperature",
+                  result: { status: "ok", mode: "demo" },
+                }
+              : {
+                  kind: "api",
+                  orderId: order.id,
+                  requestHash: order.requestHash,
+                  resultUri,
+                  responseHash: hashValue(`demo-proof:${order.id}`),
+                  timestamp: now(),
+                  result: { status: "ok", mode: "demo" },
+                },
+        };
+      } else {
+        const expectedSigner =
+          args.proofSubmission!.payload.kind === "iot" ? signingPolicy.deviceSigner : signingPolicy.providerWallet;
+
+        verifiedProof = await verifyProofSubmission({
+          order,
+          submission: args.proofSubmission!,
+          expectedSigner,
+          expectedDeviceId: order.serviceType === "iot_action" ? expectedDeviceId(order) : undefined,
+        });
+      }
 
       order.status = "fulfilled";
       order.fulfilledAt = now();
@@ -771,7 +810,8 @@ export async function transitionOrder(args: {
         payloadJson: {
           providerId: order.providerId,
           providerWallet: signingPolicy.providerWallet,
-          expectedSigner,
+          expectedSigner:
+            verifiedProof.payload.kind === "iot" ? signingPolicy.deviceSigner : signingPolicy.providerWallet,
           signerSource: signingPolicy.source,
           message: verifiedProof.message,
           payload: verifiedProof.payload,
@@ -779,7 +819,7 @@ export async function transitionOrder(args: {
           summary: order.proof.summary,
           submittedAt: order.proof.submittedAt,
         },
-        signature: args.proofSubmission.signature,
+        signature: args.proofSubmission?.signature ?? txHash(`demo-proof-signature:${order.id}`),
         proofHash: order.proof.hash,
         verified: true,
         verifiedAt: order.proof.submittedAt,

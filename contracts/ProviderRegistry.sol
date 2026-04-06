@@ -3,6 +3,9 @@ pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
+/**
+ * @custom:security-contact security@agentrail.dev
+ */
 contract ProviderRegistry is Ownable {
     struct Provider {
         address wallet;
@@ -17,6 +20,7 @@ contract ProviderRegistry is Ownable {
     mapping(bytes32 => Provider) private providers;
 
     error InvalidAddress();
+    error InvalidProviderId();
     error ProviderNotFound();
 
     event ProviderUpserted(
@@ -44,6 +48,7 @@ contract ProviderRegistry is Ownable {
         string calldata name,
         string calldata metadataURI
     ) external onlyOwner {
+        if (providerId == bytes32(0)) revert InvalidProviderId();
         if (wallet == address(0)) revert InvalidAddress();
         if (deviceSigner == address(0)) revert InvalidAddress();
 

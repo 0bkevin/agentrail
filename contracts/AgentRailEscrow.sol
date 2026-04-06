@@ -6,6 +6,9 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+/**
+ * @custom:security-contact security@agentrail.dev
+ */
 contract AgentRailEscrow is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -67,6 +70,7 @@ contract AgentRailEscrow is Ownable, ReentrancyGuard {
     error ChallengeWindowStillOpen(uint64 challengeDeadline);
     error ChallengeWindowClosed(uint64 challengeDeadline);
     error InvalidBps();
+    error UnexpectedTokenAmountReceived(uint256 expected, uint256 actual);
 
     event OrderCreated(
         uint256 indexed orderId,
@@ -145,7 +149,7 @@ contract AgentRailEscrow is Ownable, ReentrancyGuard {
             serviceType: serviceType
         });
 
-        IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), paymentAmount);
+        _pullExactTokens(paymentToken, msg.sender, paymentAmount);
 
         emit OrderCreated(
             orderId,
@@ -168,7 +172,7 @@ contract AgentRailEscrow is Ownable, ReentrancyGuard {
         order.status = OrderStatus.Accepted;
 
         if (order.providerStake > 0) {
-            IERC20(order.paymentToken).safeTransferFrom(msg.sender, address(this), order.providerStake);
+            _pullExactTokens(order.paymentToken, msg.sender, order.providerStake);
         }
 
         emit OrderAccepted(orderId, msg.sender, order.providerStake);
@@ -325,5 +329,14 @@ contract AgentRailEscrow is Ownable, ReentrancyGuard {
         if (order.status != expectedStatus) {
             revert InvalidState(expectedStatus, order.status);
         }
+    }
+
+    function _pullExactTokens(address token, address from, uint256 amount) internal {
+        IERC20 erc20Token = IERC20(token);
+        uint256 balanceBefore = erc20Token.balanceOf(address(this));
+        erc20Token.safeTransferFrom(from, address(this), amount);
+        uint256 balanceAfter = erc20Token.balanceOf(address(this));
+        uint256 received = balanceAfter - balanceBefore;
+        if (received != amount) revert UnexpectedTokenAmountReceived(amount, received);
     }
 }

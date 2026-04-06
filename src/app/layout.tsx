@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
-import Link from "next/link";
 
 import { ReownProvider } from "@/components/reown-provider";
+import { Navigation } from "@/components/navigation";
 
 import "./globals.css";
 
@@ -35,18 +35,10 @@ export default async function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[radial-gradient(circle_at_top,_#16243b,_#07111f_55%,_#04070d_100%)] text-white">
+      <body className="min-h-full flex flex-col font-mono text-white selection:bg-brut-red selection:text-black">
         <ReownProvider cookies={cookies}>
-          <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/70 backdrop-blur">
-            <nav className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-              <Link href="/" className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium tracking-[0.2em] text-cyan-100 uppercase">
-                AgentRail
-              </Link>
-              <Link href="/buyer" className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/8">Buyer</Link>
-              <Link href="/provider" className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/8">Provider</Link>
-              <Link href="/operator" className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/8">Operator</Link>
-              <Link href="/arbiter" className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/8">Arbiter</Link>
-            </nav>
+          <header className="sticky top-0 z-40 border-b-2 border-brut-red bg-black/90 backdrop-blur shadow-[0px_4px_0px_0px_var(--brut-red)] mb-6">
+            <Navigation />
           </header>
           {children}
         </ReownProvider>

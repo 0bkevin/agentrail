@@ -1,12 +1,12 @@
 import type { TerminalEntry } from "@/lib/agentrail-types";
 
 const COLORS: Record<TerminalEntry["level"], string> = {
-  system: "text-slate-500",
-  info: "text-slate-300",
-  warn: "text-amber-300",
-  success: "text-emerald-300",
-  error: "text-rose-300",
-  confirm: "text-cyan-300",
+  system: "text-white/50",
+  info: "text-white/80",
+  warn: "text-brut-red",
+  success: "text-green-500",
+  error: "text-brut-red font-black underline",
+  confirm: "text-brut-red font-bold",
 };
 
 function formatTime(timestamp: number) {
@@ -19,22 +19,28 @@ function formatTime(timestamp: number) {
 
 export function TerminalPanel({ terminal }: { terminal: TerminalEntry[] }) {
   return (
-    <section className="overflow-hidden rounded-3xl border border-cyan-500/20 bg-[#07101d] shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
-      <div className="flex items-center justify-between border-b border-cyan-500/10 px-4 py-3">
+    <section className="brutalist-container !p-0 flex flex-col group h-full max-h-[500px]">
+      <div className="flex items-center justify-between border-b-2 border-brut-red bg-black px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-rose-400/80" />
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-300/80" />
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-300/80" />
+          <span className="h-3 w-3 bg-brut-red opacity-80" />
+          <span className="h-3 w-3 bg-brut-red opacity-50" />
+          <span className="h-3 w-3 bg-brut-red opacity-30" />
         </div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-cyan-200/70">Execution Log</p>
+        <p className="font-mono text-xs font-black uppercase tracking-[0.3em] text-brut-red group-hover:hover-glitch">SYS_LOGS</p>
       </div>
-      <div className="max-h-[360px] space-y-2 overflow-y-auto px-4 py-4 font-mono text-xs">
-        {terminal.map((line) => (
-          <div key={line.id} className="grid grid-cols-[70px_1fr] gap-3 rounded-xl bg-white/[0.02] px-3 py-2">
-            <span className="text-slate-600">{formatTime(line.timestamp)}</span>
-            <span className={COLORS[line.level]}>{line.text}</span>
-          </div>
-        ))}
+      <div className="flex-1 space-y-2 overflow-y-auto p-4 font-mono text-xs bg-[url('/scanline.png')] bg-cover relative min-h-[300px]">
+        <div className="absolute inset-0 bg-black/60 pointer-events-none"></div>
+        <div className="relative z-10 flex flex-col gap-2">
+          {terminal.map((line) => (
+            <div key={line.id} className="grid grid-cols-[70px_1fr] gap-3 border border-brut-accent bg-black p-2 hover:border-brut-red transition-colors">
+              <span className="text-white/40">{formatTime(line.timestamp)}</span>
+              <span className={`${COLORS[line.level]} uppercase tracking-tight break-words`}>{line.text}</span>
+            </div>
+          ))}
+          {terminal.length === 0 && (
+            <div className="text-white/40 uppercase tracking-widest text-center py-10 animate-pulse">Awaiting inputs...</div>
+          )}
+        </div>
       </div>
     </section>
   );

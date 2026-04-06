@@ -1,44 +1,48 @@
 export function LandingHero() {
   return (
     <>
-      <section className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
-        <div>
-          <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/70">AgentRail</p>
-          <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
-            The trust and settlement rail for AI agents and connected devices.
+      <section className="grid gap-12 lg:grid-cols-[1.2fr_0.8fr] lg:items-end w-full relative z-10">
+        <div className="relative">
+          <div className="absolute -left-4 top-0 w-2 h-full bg-brut-red hover:w-6 transition-all duration-500 cursor-none"></div>
+          <p className="text-sm font-black uppercase tracking-[0.35em] text-brut-red mb-6 animate-pulse hover-glitch">AGENTRAIL // SYSTEM_ONLINE</p>
+          <h1 className="mt-4 max-w-4xl text-6xl font-black tracking-tighter text-white uppercase sm:text-7xl lg:text-[6rem] leading-[0.85] select-none hover:text-brut-red transition-colors duration-700">
+            The trust &amp; settlement rail for <span className="text-brut-red relative inline-block group hover:text-white transition-colors duration-300">
+              autonomous entities.
+              <span className="absolute bottom-0 left-0 w-full h-2 bg-brut-red group-hover:bg-white transition-colors duration-300"></span>
+            </span>
           </h1>
-          <p className="mt-6 max-w-3xl text-base leading-8 text-slate-300 sm:text-lg">
-            AgentRail coordinates escrow, signed fulfillment proofs, optimistic verification windows, and dispute
-            fallback for autonomous commerce.
+          <p className="mt-12 max-w-3xl text-xl font-mono text-white/80 uppercase border-y border-brut-red/30 py-6 tracking-wider leading-relaxed">
+            AgentRail coordinates escrow, signed fulfillment proofs, optimistic verification windows, and dispute fallback for machine-to-machine commerce.
           </p>
         </div>
 
-        <div className="rounded-[32px] border border-cyan-300/20 bg-cyan-400/8 p-6 shadow-[0_20px_80px_rgba(34,211,238,0.12)] backdrop-blur">
-          <p className="text-xs uppercase tracking-[0.3em] text-cyan-200/70">What this build proves</p>
-          <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-200">
-            <li>AI request normalization into a structured order proposal</li>
-            <li>Escrow funding before any provider action</li>
-            <li>Provider stake and proof submission</li>
-            <li>Optimistic challenge window before settlement</li>
-            <li>Arbiter fallback for disputed proofs</li>
+        <div className="brutalist-container transform translate-y-8 hover:translate-y-4 transition-transform duration-500 bg-black/80 backdrop-blur-sm border-4 hover:shadow-[16px_16px_0px_0px_var(--brut-red)]">
+          <div className="absolute top-0 right-0 p-2 bg-brut-red text-black font-black text-xs hover-glitch cursor-help">V.0.1.0</div>
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-brut-red mb-8 border-b border-brut-red/30 pb-4">WHAT_THIS_BUILD_PROVES</p>
+          <ul className="space-y-6 text-sm font-mono uppercase text-white/90">
+            <li className="flex items-start gap-4 group cursor-crosshair">
+              <span className="text-brut-red mt-1 group-hover:animate-ping">]</span>
+              <span className="group-hover:text-brut-red transition-colors">AI request normalization into a structured order proposal</span>
+            </li>
+            <li className="flex items-start gap-4 group cursor-crosshair">
+              <span className="text-brut-red mt-1 group-hover:animate-ping">]</span>
+              <span className="group-hover:text-brut-red transition-colors">Escrow funding before any provider action</span>
+            </li>
+            <li className="flex items-start gap-4 group cursor-crosshair">
+              <span className="text-brut-red mt-1 group-hover:animate-ping">]</span>
+              <span className="group-hover:text-brut-red transition-colors">Provider stake and proof submission</span>
+            </li>
+            <li className="flex items-start gap-4 group cursor-crosshair">
+              <span className="text-brut-red mt-1 group-hover:animate-ping">]</span>
+              <span className="group-hover:text-brut-red transition-colors">Optimistic challenge window before settlement</span>
+            </li>
+            <li className="flex items-start gap-4 group cursor-crosshair">
+              <span className="text-brut-red mt-1 group-hover:animate-ping">]</span>
+              <span className="group-hover:text-brut-red transition-colors">Arbiter fallback for disputed proofs</span>
+            </li>
           </ul>
         </div>
       </section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <TrustCard title="Innovation" body="Autonomous commerce with escrow, proof verification, and dispute-aware settlement." />
-        <TrustCard title="Technical execution" body="Next.js app-router MVP with real route handlers and an inspectable order state machine." />
-        <TrustCard title="Business viability" body="A reusable operator rail for API vendors, IoT fleets, marketplaces, and agent platforms." />
-      </section>
     </>
-  );
-}
-
-function TrustCard({ title, body }: { title: string; body: string }) {
-  return (
-    <section className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-      <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{title}</p>
-      <p className="mt-3 text-sm leading-7 text-slate-300">{body}</p>
-    </section>
   );
 }

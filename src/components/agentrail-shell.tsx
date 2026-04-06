@@ -1,6 +1,6 @@
 "use client";
 
-import { useAppKit, useAppKitAccount, useAppKitNetwork, useDisconnect } from "@reown/appkit/react";
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   useReadContract,
@@ -10,8 +10,6 @@ import {
 } from "wagmi";
 import { decodeEventLog, encodePacked, keccak256, parseUnits } from "viem";
 
-import { FlowDiagram } from "@/components/flow-diagram";
-import { TerminalPanel } from "@/components/terminal-panel";
 import { ToolApprovalCard } from "@/components/tool-approval-card";
 import {
   agentRailEscrowAbi,
@@ -82,17 +80,17 @@ function countdown(deadline?: number) {
 function orderStatusClass(status: Order["status"]) {
   switch (status) {
     case "settled":
-      return "bg-emerald-400/15 text-emerald-100 border-emerald-300/25";
+      return "bg-green-500/10 text-green-500 border-green-500";
     case "disputed":
-      return "bg-amber-400/15 text-amber-100 border-amber-300/25";
+      return "bg-yellow-500/10 text-yellow-500 border-yellow-500";
     case "refunded":
-      return "bg-rose-400/15 text-rose-100 border-rose-300/25";
+      return "bg-brut-red/10 text-brut-red border-brut-red";
     case "fulfilled":
-      return "bg-violet-400/15 text-violet-100 border-violet-300/25";
+      return "bg-white/10 text-white border-white";
     case "in_challenge":
-      return "bg-cyan-400/15 text-cyan-100 border-cyan-300/25";
+      return "bg-cyan-400/15 text-brut-red border-cyan-300/25";
     default:
-      return "bg-white/6 text-slate-100 border-white/12";
+      return "bg-brut-accent text-white border-brut-accent";
   }
 }
 
@@ -172,6 +170,7 @@ const ZERO_BI = BigInt(0);
 const ONE_BI = BigInt(1);
 
 function activeOrderFrom(snapshot: DashboardSnapshot) {
+  if (!snapshot?.orders) return undefined;
   return snapshot.orders.find((order) => ["funded", "accepted", "fulfilled", "in_challenge", "disputed"].includes(order.status)) ?? snapshot.orders[0];
 }
 
@@ -182,11 +181,9 @@ export function AgentRailShell({
   initialSnapshot: DashboardSnapshot;
   initialRole?: RoleTab;
 }) {
-  const { open } = useAppKit();
-  const { address, isConnected } = useAppKitAccount();
+    const { address, isConnected } = useAppKitAccount();
   const { caipNetwork } = useAppKitNetwork();
-  const { disconnect } = useDisconnect();
-  const { signMessageAsync } = useSignMessage();
+    const { signMessageAsync } = useSignMessage();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
 
@@ -202,7 +199,7 @@ export function AgentRailShell({
   const connectedAddress = (isConnected && address ? address : null) as `0x${string}` | null;
   const [sessionAddress, setSessionAddress] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
-  const isOnBase = caipNetwork?.id === "eip155:84532" || caipNetwork?.id === "eip155:8453";
+  const isOnSepolia = caipNetwork?.id === "eip155:11155111";
   const isAuthenticated = Boolean(
     connectedAddress && sessionAddress && connectedAddress.toLowerCase() === sessionAddress.toLowerCase(),
   );
@@ -219,11 +216,18 @@ export function AgentRailShell({
   });
 
   const refresh = useCallback(async () => {
-    const response = await fetch("/api/demo", { cache: "no-store" });
-    const json = (await response.json()) as DashboardSnapshot;
-    setSnapshot(json);
-    if (!selectedOrderId && json.orders[0]) {
-      setSelectedOrderId(json.orders[0].id);
+    try {
+      const response = await fetch("/api/demo", { cache: "no-store" });
+      if (!response.ok) return;
+      const json = (await response.json()) as DashboardSnapshot;
+      if (json && Array.isArray(json.orders)) {
+        setSnapshot(json);
+        if (!selectedOrderId && json.orders[0]) {
+          setSelectedOrderId(json.orders[0].id);
+        }
+      }
+    } catch (e) {
+      // Ignore network errors on refresh interval
     }
   }, [selectedOrderId]);
 
@@ -250,15 +254,34 @@ export function AgentRailShell({
     void syncSession();
   }, [connectedAddress, syncSession]);
 
+  useEffect(() => {
+    const handleAuthChange = () => {
+      if (!connectedAddress) {
+        setSessionAddress(null);
+        return;
+      }
+
+      void syncSession();
+    };
+
+    window.addEventListener("auth-change", handleAuthChange);
+    return () => {
+      window.removeEventListener("auth-change", handleAuthChange);
+    };
+  }, [connectedAddress, syncSession]);
+
   const activeOrder = useMemo(() => {
+    if (!snapshot?.orders) return undefined;
     return snapshot.orders.find((order) => order.id === selectedOrderId) ?? activeOrderFrom(snapshot);
   }, [selectedOrderId, snapshot]);
 
   const selectedProvider = useMemo(() => {
+    if (!snapshot?.providers) return undefined;
     return snapshot.providers.find((provider) => provider.id === selectedProviderId) ?? snapshot.providers[0];
-  }, [selectedProviderId, snapshot.providers]);
+  }, [selectedProviderId, snapshot]);
 
   const visibleOrders = useMemo(() => {
+    if (!snapshot?.orders) return [];
     switch (role) {
       case "provider":
         return snapshot.orders.filter(
@@ -273,10 +296,10 @@ export function AgentRailShell({
       default:
         return snapshot.orders;
     }
-  }, [role, selectedProvider, snapshot.orders, operatorFilter]);
+  }, [role, selectedProvider, snapshot, operatorFilter]);
 
   const providerEarnings = useMemo(() => {
-    if (!selectedProvider) {
+    if (!selectedProvider || !snapshot?.orders) {
       return { settledCount: 0, disputedCount: 0, grossRevenue: 0 };
     }
 
@@ -288,7 +311,7 @@ export function AgentRailShell({
       .reduce((sum, order) => sum + order.paymentAmount, 0);
 
     return { settledCount, disputedCount, grossRevenue };
-  }, [selectedProvider, snapshot.orders]);
+  }, [selectedProvider, snapshot]);
 
   async function handleProposal() {
     if (!isAuthenticated) {
@@ -692,7 +715,7 @@ export function AgentRailShell({
     setMessage(null);
 
     try {
-      const challenge = await postJson<{ message: string }>("/api/auth/challenge", {
+      const challenge = await postJson<{ message: string; challengeToken: string }>("/api/auth/challenge", {
         address: connectedAddress,
       });
       const signature = await signMessageAsync({ message: challenge.message });
@@ -701,9 +724,11 @@ export function AgentRailShell({
         address: connectedAddress,
         message: challenge.message,
         signature,
+        challengeToken: challenge.challengeToken,
       });
 
       await syncSession();
+      window.dispatchEvent(new Event("auth-change"));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Wallet authentication failed.");
     } finally {
@@ -719,7 +744,7 @@ export function AgentRailShell({
     }
 
     setSessionAddress(null);
-    disconnect();
+    window.dispatchEvent(new Event("auth-change"));
   }
 
   async function waitForTx(hash: `0x${string}`) {
@@ -765,405 +790,201 @@ export function AgentRailShell({
     return undefined;
   }
 
+  if (!snapshot || !snapshot.orders || !snapshot.metrics || !snapshot.providers) {
+    return (
+      <div className="brutalist-container text-center py-20 text-brut-red font-mono uppercase animate-pulse">
+        System Initializing...
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
-      <section className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Wallet authentication</p>
-            <h2 className="mt-2 text-lg font-semibold text-white">
-              {isAuthenticated ? "Wallet authenticated" : isConnected ? "Wallet connected" : "Connect a wallet to use AgentRail"}
-            </h2>
-            <p className="mt-2 text-sm text-slate-300">
-              Reown AppKit now backs the wallet connection, and a signed session gates privileged AgentRail actions.
-            </p>
-          </div>
+      {message && (
+        <div className="border-2 border-brut-red bg-brut-red/10 px-4 py-3 text-sm font-mono text-brut-red font-bold uppercase">
+          {message}
+        </div>
+      )}
 
-          <div className="flex flex-wrap items-center gap-3">
-            {isConnected && connectedAddress ? (
-              <>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3 text-sm text-slate-200">
-                  <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Address</p>
-                  <p className="mt-1 font-mono">{connectedAddress}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3 text-sm text-slate-200">
-                  <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Network</p>
-                  <p className="mt-1">{caipNetwork?.name ?? "Unknown"}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3 text-sm text-slate-200">
-                  <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Session</p>
-                  <p className="mt-1">{isAuthenticated ? "Authenticated" : authPending ? "Signing..." : "Unauthenticated"}</p>
-                </div>
-                {!isAuthenticated && (
-                  <button
-                    type="button"
-                    onClick={authenticateWallet}
-                    disabled={authPending}
-                    className="rounded-full bg-cyan-300 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {authPending ? "Awaiting signature..." : "Authenticate wallet"}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => open({ view: "Networks" })}
-                  className="rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/6"
-                >
-                  Switch network
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleDisconnect();
-                  }}
-                  className="rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/6"
-                >
-                  Disconnect
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => open()}
-                className="rounded-full bg-cyan-300 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
-              >
-                Connect wallet
-              </button>
-            )}
+      {role === "buyer" && (
+        <section className="brutalist-container !p-6">
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-brut-red mb-4">AGENT_INTENT_PROMPT</p>
+          <div className="space-y-4">
+            <textarea
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="DESCRIBE_THE_SERVICE_NEEDED..."
+              className="brutalist-input min-h-[120px] text-lg"
+            />
+            <button
+              type="button"
+              disabled={isPending || !isAuthenticated}
+              onClick={handleProposal}
+              className="brutalist-button w-full !text-lg !py-4"
+            >
+              {isPending ? "ANALYZING_REQUEST..." : "GENERATE_PROPOSAL_HASH"}
+            </button>
           </div>
+        </section>
+      )}
+
+      {role === "provider" && (
+        <section className="brutalist-container !p-6 flex flex-col gap-4 md:flex-row md:items-end justify-between">
+          <div className="flex-1">
+            <p className="text-xs font-black uppercase tracking-[0.3em] text-brut-red mb-4">ACTIVE_IDENTITY</p>
+            <select
+              value={selectedProviderId}
+              onChange={(event) => setSelectedProviderId(event.target.value)}
+              className="brutalist-input"
+            >
+              {snapshot.providers.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.name} [{provider.roleLabel}]
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
+      )}
+
+      {role === "operator" && (
+        <section className="brutalist-container !p-6 flex flex-col gap-4 md:flex-row md:items-end justify-between">
+          <div className="flex-1">
+            <p className="text-xs font-black uppercase tracking-[0.3em] text-brut-red mb-4">STATE_FILTER</p>
+            <select
+              value={operatorFilter}
+              onChange={(event) => setOperatorFilter(event.target.value as OperatorFilter)}
+              className="brutalist-input"
+            >
+              <option value="all">ALL_STATES</option>
+              <option value="funded">FUNDED</option>
+              <option value="accepted">ACCEPTED</option>
+              <option value="fulfilled">FULFILLED</option>
+              <option value="in_challenge">IN_CHALLENGE</option>
+              <option value="disputed">DISPUTED</option>
+              <option value="settled">SETTLED</option>
+              <option value="refunded">REFUNDED</option>
+              <option value="cancelled">CANCELLED</option>
+            </select>
+          </div>
+        </section>
+      )}
+
+      {proposal && role === "buyer" && (
+        <ToolApprovalCard
+          proposal={proposal}
+          busy={isPending}
+          onApprove={handleApproveProposal}
+          onReject={() => setProposal(null)}
+        />
+      )}
+
+      <section className="mt-8">
+        <div className="flex items-center justify-between border-b-2 border-brut-accent pb-4 mb-6">
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-white/50">ACTIONABLE_ORDERS_QUEUE</p>
+          <span className="text-brut-red font-mono font-bold text-xs">[{visibleOrders.length}_ITEMS]</span>
         </div>
 
-        {!isOnBase && isConnected && (
-          <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-            Switch to Base Sepolia for the intended MVP flow. Mainnet Base is also recognized for future deployment.
-          </div>
-        )}
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-4">
-        {[
-          { label: "Active orders", value: snapshot.metrics.activeOrders, tone: "text-cyan-100" },
-          { label: "Secured volume", value: currency(snapshot.metrics.securedVolumeUsd), tone: "text-white" },
-          { label: "Disputes open", value: snapshot.metrics.disputedOrders, tone: "text-amber-100" },
-          { label: "Settlement rate", value: `${snapshot.metrics.settlementRate}%`, tone: "text-emerald-100" },
-        ].map((metric) => (
-          <div key={metric.label} className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{metric.label}</p>
-            <p className={`mt-3 text-3xl font-semibold ${metric.tone}`}>{metric.value}</p>
-          </div>
-        ))}
-      </section>
-
-      <FlowDiagram order={activeOrder} />
-
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-3 backdrop-blur">
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(ROLE_COPY) as RoleTab[]).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setRole(tab)}
-                  className={[
-                    "rounded-full px-4 py-2 text-sm font-medium transition",
-                    role === tab ? "bg-white text-slate-950" : "bg-transparent text-slate-300 hover:bg-white/7",
-                  ].join(" ")}
-                >
-                  {ROLE_COPY[tab].title}
-                </button>
-              ))}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {visibleOrders.length === 0 && (
+            <div className="col-span-full brutalist-container !p-12 text-center text-white/30 font-mono text-xl animate-pulse">
+              NO_ACTIVE_ORDERS_DETECTED
             </div>
-          </div>
-
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{ROLE_COPY[role].title}</p>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">{ROLE_COPY[role].blurb}</p>
-
-            {role === "buyer" && (
-              <div className="mt-6 space-y-4">
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-white">Describe the service the agent needs</span>
-                  <textarea
-                    value={prompt}
-                    onChange={(event) => setPrompt(event.target.value)}
-                    className="min-h-32 w-full rounded-3xl border border-white/12 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/45"
-                  />
-                </label>
-                <button
-                  type="button"
-                  disabled={isPending || !isAuthenticated}
-                  onClick={handleProposal}
-                  className="rounded-full bg-cyan-300 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isPending ? "Analyzing request..." : "Generate agent proposal"}
-                </button>
-              </div>
-            )}
-
-            {role === "provider" && (
-              <div className="mt-6 space-y-4">
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-white">Active provider identity</span>
-                  <select
-                    value={selectedProviderId}
-                    onChange={(event) => setSelectedProviderId(event.target.value)}
-                    className="w-full rounded-2xl border border-white/12 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none"
-                  >
-                    {snapshot.providers.map((provider) => (
-                      <option key={provider.id} value={provider.id}>
-                        {provider.name} · {provider.roleLabel}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedProvider && (
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <ProviderCard label="Trust model" value={selectedProvider.trustModel} />
-                    <ProviderCard label="Verification" value={selectedProvider.verificationMode} />
-                    <ProviderCard label="Average latency" value={selectedProvider.avgLatency} />
-                  </div>
-                )}
-
-                {selectedProvider && (
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <ProviderCard label="Settled orders" value={String(providerEarnings.settledCount)} />
-                    <ProviderCard label="Gross revenue" value={currency(providerEarnings.grossRevenue)} />
-                    <ProviderCard label="Disputes" value={String(providerEarnings.disputedCount)} />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {role === "operator" && (
-              <div className="mt-6 grid gap-3 md:grid-cols-[1fr_1fr]">
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-white">Filter by state</span>
-                  <select
-                    value={operatorFilter}
-                    onChange={(event) => setOperatorFilter(event.target.value as OperatorFilter)}
-                    className="w-full rounded-2xl border border-white/12 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none"
-                  >
-                    <option value="all">All states</option>
-                    <option value="funded">Funded</option>
-                    <option value="accepted">Accepted</option>
-                    <option value="fulfilled">Fulfilled</option>
-                    <option value="in_challenge">In challenge</option>
-                    <option value="disputed">Disputed</option>
-                    <option value="settled">Settled</option>
-                    <option value="refunded">Refunded</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </label>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-sm text-slate-200">
-                  <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Verification queue</p>
-                  <p className="mt-2">Awaiting verifier: {snapshot.orders.filter((order) => order.status === "fulfilled").length}</p>
-                  <p className="mt-1">Open challenge windows: {snapshot.orders.filter((order) => order.status === "in_challenge").length}</p>
-                  <p className="mt-1">Disputes pending arbiter: {snapshot.orders.filter((order) => order.status === "disputed").length}</p>
-                </div>
-              </div>
-            )}
-
-            {message && (
-              <div className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-                {message}
-              </div>
-            )}
-          </section>
-
-          {proposal && role === "buyer" && (
-            <ToolApprovalCard
-              proposal={proposal}
-              busy={isPending}
-              onApprove={handleApproveProposal}
-              onReject={() => setProposal(null)}
-            />
           )}
 
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Orders</p>
-                <h3 className="mt-2 text-lg font-semibold text-white">Role-aware queue</h3>
-              </div>
-              <p className="text-sm text-slate-400">{visibleOrders.length} visible</p>
-            </div>
+          {visibleOrders.map((order) => {
+            const canAccept = role === "provider" && selectedProvider?.id === order.providerId && order.status === "funded";
+            const canProof = role === "provider" && selectedProvider?.id === order.providerId && order.status === "accepted";
+            const canStartChallenge = role === "operator" && order.status === "fulfilled";
+            const canBuyerDispute = role === "buyer" && order.status === "in_challenge";
+            const canOperatorDispute = role === "operator" && order.status === "in_challenge";
+            const canCancel = role === "buyer" && order.status === "funded";
+            const canApproveEarly = role === "buyer" && order.status === "in_challenge";
+            const canSettle = role === "operator" && order.status === "in_challenge";
+            const canResolve = role === "arbiter" && order.status === "disputed";
 
-            <div className="mt-5 space-y-3">
-              {visibleOrders.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-white/12 px-4 py-6 text-sm text-slate-400">
-                  No orders for this role yet.
+            return (
+              <div key={order.id} className="brutalist-container !p-5 flex flex-col gap-5 hover:border-brut-red transition-colors group">
+                <div className="flex justify-between items-start gap-4 border-b border-brut-accent pb-4">
+                  <div>
+                    <h3 className="font-black text-lg text-white uppercase tracking-tight group-hover:text-brut-red transition-colors">{order.title}</h3>
+                    <p className="text-xs text-white/60 font-mono mt-1 uppercase">Provider: {order.providerName}</p>
+                  </div>
+                  <span className={`border px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-widest whitespace-nowrap ${orderStatusClass(order.status)}`}>
+                    {order.status.replaceAll("_", " ")}
+                  </span>
                 </div>
-              )}
 
-              {visibleOrders.map((order) => {
-                const canAccept = role === "provider" && selectedProvider?.id === order.providerId && order.status === "funded";
-                const canProof = role === "provider" && selectedProvider?.id === order.providerId && order.status === "accepted";
-                const canStartChallenge = role === "operator" && order.status === "fulfilled";
-                const canBuyerDispute = role === "buyer" && order.status === "in_challenge";
-                const canOperatorDispute = role === "operator" && order.status === "in_challenge";
-                const canCancel = role === "buyer" && order.status === "funded";
-                const canApproveEarly = role === "buyer" && order.status === "in_challenge";
-                const canSettle = role === "operator" && order.status === "in_challenge";
-                const canResolve = role === "arbiter" && order.status === "disputed";
+                <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+                  <div className="border border-brut-accent p-3 bg-black">
+                    <span className="text-white/40 block mb-1 uppercase tracking-widest text-[10px]">ESCROW</span>
+                    <span className="text-white font-bold text-sm">{currency(order.paymentAmount)}</span>
+                  </div>
+                  <div className="border border-brut-accent p-3 bg-black">
+                    <span className="text-white/40 block mb-1 uppercase tracking-widest text-[10px]">STAKE</span>
+                    <span className="text-white font-bold text-sm">{currency(order.providerStake)}</span>
+                  </div>
+                </div>
 
-                return (
-                  <div
-                    key={order.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedOrderId(order.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        setSelectedOrderId(order.id);
-                      }
-                    }}
-                    className={[
-                      "block w-full rounded-3xl border p-4 text-left transition",
-                      selectedOrderId === order.id
-                        ? "border-cyan-300/45 bg-cyan-400/8"
-                        : "border-white/10 bg-slate-950/35 hover:bg-white/5",
-                    ].join(" ")}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-white">{order.title}</p>
-                        <p className="mt-1 text-sm text-slate-400">{order.providerName}</p>
-                      </div>
-                      <span className={`rounded-full border px-3 py-1 text-xs ${orderStatusClass(order.status)}`}>
-                        {order.status.replaceAll("_", " ")}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                      <MetaBlock label="Escrow" value={currency(order.paymentAmount)} />
-                      <MetaBlock label="Stake" value={currency(order.providerStake)} />
-                      <MetaBlock label="Challenge" value={countdown(order.challengeDeadline)} />
-                    </div>
-
-                    {(canAccept || canProof || canStartChallenge || canBuyerDispute || canOperatorDispute || canCancel || canApproveEarly || canSettle || canResolve) && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {canAccept && (
-                          <ActionButton
-                            disabled={isPending || !isAuthenticated}
-                            onClick={() => transition("accept", order.id, { role: "provider" })}
-                          >
-                            Accept and stake
-                          </ActionButton>
-                        )}
-                        {canProof && (
-                          <ActionButton disabled={isPending || !isAuthenticated} onClick={() => fulfill(order)}>
-                            Submit proof
-                          </ActionButton>
-                        )}
-                        {canStartChallenge && (
-                          <ActionButton
-                            disabled={isPending || !isAuthenticated}
-                            onClick={() => transition("start_challenge", order.id, { role: "operator" })}
-                          >
-                            Verify and open review
-                          </ActionButton>
-                        )}
-                        {canBuyerDispute && (
-                          <ActionButton
-                            disabled={isPending || !isAuthenticated}
-                            onClick={() =>
-                              dispute(order.id, "buyer", "Buyer flagged a mismatch between requested service and returned proof.")
-                            }
-                            tone="warn"
-                          >
-                            Open dispute
-                          </ActionButton>
-                        )}
-                        {canOperatorDispute && (
-                          <ActionButton
-                            disabled={isPending || !isAuthenticated}
-                            onClick={() =>
-                              dispute(order.id, "operator", "Verifier detected a payload mismatch during review.")
-                            }
-                            tone="warn"
-                          >
-                            Raise verifier dispute
-                          </ActionButton>
-                        )}
-                        {canCancel && (
-                          <ActionButton
-                            disabled={isPending || !isAuthenticated}
-                            onClick={() => transition("cancel", order.id, { role: "buyer" })}
-                            tone="warn"
-                          >
-                            Cancel order
-                          </ActionButton>
-                        )}
-                        {canApproveEarly && (
-                          <ActionButton
-                            disabled={isPending || !isAuthenticated}
-                            onClick={() => transition("approve_early", order.id, { role: "buyer" })}
-                            tone="success"
-                          >
-                            Approve early settlement
-                          </ActionButton>
-                        )}
-                        {canSettle && (
-                          <ActionButton
-                            disabled={isPending || !isAuthenticated}
-                            onClick={() => transition("settle", order.id, { role: "operator" })}
-                            tone="success"
-                          >
-                            Settle if ready
-                          </ActionButton>
-                        )}
-                        {canResolve && (
-                          <>
-                            <ActionButton
-                              disabled={isPending || !isAuthenticated}
-                              onClick={() => transition("resolve", order.id, { role: "arbiter", providerWins: true })}
-                              tone="success"
-                            >
-                              Resolve provider wins
-                            </ActionButton>
-                            <ActionButton
-                              disabled={isPending || !isAuthenticated}
-                              onClick={() => transition("resolve", order.id, { role: "arbiter", providerWins: false })}
-                              tone="danger"
-                            >
-                              Resolve buyer refunded
-                            </ActionButton>
-                          </>
-                        )}
+                {(canAccept || canProof || canStartChallenge || canBuyerDispute || canOperatorDispute || canCancel || canApproveEarly || canSettle || canResolve) && (
+                  <div className="flex flex-col gap-3 mt-2 border-t border-brut-accent pt-5">
+                    {canAccept && (
+                      <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("accept", order.id, { role: "provider" })}>
+                        ACCEPT_AND_STAKE
+                      </ActionButton>
+                    )}
+                    {canProof && (
+                      <ActionButton disabled={isPending || !isAuthenticated} onClick={() => fulfill(order)}>
+                        SUBMIT_PROOF_HASH
+                      </ActionButton>
+                    )}
+                    {canStartChallenge && (
+                      <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("start_challenge", order.id, { role: "operator" })}>
+                        VERIFY_AND_OPEN_REVIEW
+                      </ActionButton>
+                    )}
+                    {canBuyerDispute && (
+                      <ActionButton disabled={isPending || !isAuthenticated} onClick={() => dispute(order.id, "buyer", "Buyer flagged a mismatch between requested service and returned proof.")} tone="warn">
+                        OPEN_DISPUTE
+                      </ActionButton>
+                    )}
+                    {canOperatorDispute && (
+                      <ActionButton disabled={isPending || !isAuthenticated} onClick={() => dispute(order.id, "operator", "Verifier detected a payload mismatch during review.")} tone="warn">
+                        RAISE_VERIFIER_DISPUTE
+                      </ActionButton>
+                    )}
+                    {canCancel && (
+                      <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("cancel", order.id, { role: "buyer" })} tone="warn">
+                        CANCEL_ORDER
+                      </ActionButton>
+                    )}
+                    {canApproveEarly && (
+                      <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("approve_early", order.id, { role: "buyer" })} tone="success">
+                        APPROVE_EARLY_SETTLEMENT
+                      </ActionButton>
+                    )}
+                    {canSettle && (
+                      <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("settle", order.id, { role: "operator" })} tone="success">
+                        SETTLE_IF_READY
+                      </ActionButton>
+                    )}
+                    {canResolve && (
+                      <div className="flex flex-col gap-3">
+                        <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("resolve", order.id, { role: "arbiter", providerWins: true })} tone="success">
+                          RESOLVE_PROVIDER_WINS
+                        </ActionButton>
+                        <ActionButton disabled={isPending || !isAuthenticated} onClick={() => transition("resolve", order.id, { role: "arbiter", providerWins: false })} tone="danger">
+                          RESOLVE_BUYER_REFUNDED
+                        </ActionButton>
                       </div>
                     )}
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        </div>
-
-        <div className="space-y-6">
-          <OrderDetail order={activeOrder} />
-          <TerminalPanel terminal={snapshot.terminal} />
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
-    </div>
-  );
-}
-
-function ProviderCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-      <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{label}</p>
-      <p className="mt-2 text-sm text-slate-200">{value}</p>
-    </div>
-  );
-}
-
-function MetaBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{label}</p>
-      <p className="mt-1 text-sm text-slate-200">{value}</p>
     </div>
   );
 }
@@ -1194,82 +1015,9 @@ function ActionButton({
         event.stopPropagation();
         onClick();
       }}
-      className={`rounded-full px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${tones[tone]}`}
+      className={`px-4 py-2 font-mono font-bold uppercase tracking-widest border border-transparent text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${tones[tone]}`}
     >
       {children}
     </button>
-  );
-}
-
-function OrderDetail({ order }: { order?: Order }) {
-  if (!order) {
-    return (
-      <section className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-slate-400 backdrop-blur">
-        No active order selected.
-      </section>
-    );
-  }
-
-  return (
-    <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Selected order</p>
-          <h3 className="mt-2 text-xl font-semibold text-white">{order.title}</h3>
-          <p className="mt-2 text-sm leading-7 text-slate-300">{order.summary}</p>
-        </div>
-        <span className={`rounded-full border px-3 py-1 text-xs ${orderStatusClass(order.status)}`}>
-          {order.status.replaceAll("_", " ")}
-        </span>
-      </div>
-
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-        <ProviderCard label="Provider" value={order.providerName} />
-        <ProviderCard label="Payment token" value={order.paymentToken} />
-        <ProviderCard label="Created" value={formatDate(order.createdAt)} />
-        <ProviderCard label="Challenge window" value={countdown(order.challengeDeadline)} />
-      </div>
-
-      <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Proof and receipts</p>
-        <div className="mt-3 space-y-2 text-sm text-slate-200">
-          <p>Request hash: <span className="font-mono text-slate-300">{order.requestHash.slice(0, 18)}...</span></p>
-          <p>Create tx: <span className="font-mono text-slate-300">{order.txCreate.slice(0, 18)}...</span></p>
-          {order.txAccept && <p>Accept tx: <span className="font-mono text-slate-300">{order.txAccept.slice(0, 18)}...</span></p>}
-          {order.txSubmit && <p>Proof tx: <span className="font-mono text-slate-300">{order.txSubmit.slice(0, 18)}...</span></p>}
-          {order.txSettle && <p>Settle tx: <span className="font-mono text-slate-300">{order.txSettle.slice(0, 18)}...</span></p>}
-          {order.txDispute && <p>Dispute tx: <span className="font-mono text-slate-300">{order.txDispute.slice(0, 18)}...</span></p>}
-          {order.txResolve && <p>Resolve tx: <span className="font-mono text-slate-300">{order.txResolve.slice(0, 18)}...</span></p>}
-          {order.proof && (
-            <>
-              <p>Proof review: <span className="text-slate-300">{order.status === "fulfilled" ? "awaiting verifier" : order.status === "in_challenge" ? "review open" : "finalized"}</span></p>
-              <p>Proof hash: <span className="font-mono text-slate-300">{order.proof.hash.slice(0, 18)}...</span></p>
-              <p>Artifact URI: <span className="font-mono text-slate-300">{order.proof.resultUri}</span></p>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Activity timeline</p>
-        <div className="mt-3 space-y-3">
-          {order.activity.map((entry) => (
-            <div key={entry.id} className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-white">{entry.label}</p>
-                <p className="text-xs text-slate-500">{formatDate(entry.timestamp)}</p>
-              </div>
-              <p className="mt-1 text-sm text-slate-300">{entry.detail}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {order.resolution && (
-        <div className="mt-5 rounded-2xl border border-amber-300/15 bg-amber-400/8 px-4 py-3 text-sm text-amber-100">
-          {order.resolution}
-        </div>
-      )}
-    </section>
   );
 }

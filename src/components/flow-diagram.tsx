@@ -20,6 +20,8 @@ function activeIndex(order?: Order) {
       return 1;
     case "accepted":
       return 2;
+    case "fulfilled":
+      return 3;
     case "in_challenge":
       return 4;
     case "disputed":
@@ -37,40 +39,44 @@ export function FlowDiagram({ order }: { order?: Order }) {
   const currentIndex = activeIndex(order);
 
   return (
-    <section className="rounded-3xl border border-white/12 bg-white/5 p-5 shadow-[0_20px_80px_rgba(10,15,26,0.35)] backdrop-blur">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <section className="brutalist-container group">
+      <div className="mb-6 flex items-center justify-between gap-3 border-b-2 border-brut-accent pb-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-cyan-200/70">Settlement Flow</p>
-          <h3 className="mt-1 text-lg font-semibold text-white">Optimistic escrow lifecycle</h3>
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-brut-red mb-1 group-hover:hover-glitch">SETTLEMENT_FLOW</p>
+          <h3 className="text-lg font-bold text-white uppercase tracking-tight">Optimistic escrow lifecycle</h3>
         </div>
-        <div className="rounded-full border border-white/12 bg-slate-950/60 px-3 py-1 text-xs text-slate-300">
-          {order ? order.status.replaceAll("_", " ") : "waiting for request"}
+        <div className="border border-brut-red bg-black px-4 py-2 font-mono text-xs font-bold text-brut-red uppercase tracking-widest shadow-[4px_4px_0px_0px_var(--brut-red)]">
+          {order ? order.status.replaceAll("_", " ") : "WAITING_FOR_REQUEST"}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-start gap-4">
         {STEPS.map((step, index) => {
           const isComplete = index < currentIndex;
           const isActive = index === currentIndex;
 
           return (
-            <div key={step.label} className="flex min-w-[140px] flex-1 items-center gap-3">
+            <div key={step.label} className="flex min-w-[150px] flex-1 flex-col gap-3 relative">
               <div
                 className={[
-                  "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-semibold",
+                  "flex h-12 w-12 items-center justify-center border-2 font-mono text-sm font-bold z-10 transition-colors",
                   isActive
-                    ? "border-cyan-300 bg-cyan-400/15 text-cyan-100"
+                    ? "border-brut-red bg-brut-red text-black shadow-[4px_4px_0px_0px_rgba(255,255,255,0.2)] animate-pulse"
                     : isComplete
-                      ? "border-emerald-300/60 bg-emerald-400/15 text-emerald-100"
-                      : "border-white/12 bg-slate-950/70 text-slate-400",
+                      ? "border-white bg-white text-black shadow-[4px_4px_0px_0px_var(--brut-red)]"
+                      : "border-brut-accent bg-black text-white/40",
                 ].join(" ")}
               >
                 {index + 1}
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-white">{step.label}</p>
-                <p className="text-xs text-slate-400">{step.sub}</p>
+              <div className="min-w-0 font-mono">
+                <p className={`text-sm font-bold uppercase tracking-wide ${isActive || isComplete ? "text-white" : "text-white/50"}`}>{step.label}</p>
+                <p className={`text-xs uppercase mt-1 ${isActive ? "text-brut-red" : isComplete ? "text-white/70" : "text-white/40"}`}>{step.sub}</p>
               </div>
+              {/* Connector line */}
+              {index < STEPS.length - 1 && (
+                <div className={`absolute top-6 left-12 right-0 h-0.5 -z-0 -mr-4 ${isComplete ? "bg-white" : "bg-brut-accent"}`}></div>
+              )}
             </div>
           );
         })}

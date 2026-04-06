@@ -12,62 +12,66 @@ export function ToolApprovalCard({
   onReject: () => void;
 }) {
   return (
-    <section className="rounded-3xl border border-cyan-300/25 bg-cyan-400/8 p-5 text-white shadow-[0_18px_60px_rgba(34,211,238,0.12)]">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <section className="brutalist-container !border-white text-white group shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
+      <div className="absolute top-0 right-0 p-2 bg-white text-black font-black text-xs">AWAITING_APPROVAL</div>
+      <div className="mb-6 border-b-2 border-white pb-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-cyan-200/75">AI Proposal</p>
-          <h3 className="mt-1 text-lg font-semibold">{proposal.title}</h3>
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-white mb-2">AI_PROPOSAL</p>
+          <h3 className="text-2xl font-black uppercase tracking-tighter">{proposal.title}</h3>
         </div>
-        <span className="rounded-full border border-cyan-200/20 bg-slate-950/50 px-3 py-1 text-xs text-cyan-100">
-          {proposal.serviceType.replaceAll("_", " ")}
-        </span>
-      </div>
-
-      <p className="text-sm leading-6 text-slate-200">{proposal.summary}</p>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Provider</p>
-          <p className="mt-2 text-sm font-medium text-white">{proposal.providerName}</p>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Escrow</p>
-          <p className="mt-2 text-sm font-medium text-white">${proposal.paymentAmount} mockUSDC</p>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Provider Stake</p>
-          <p className="mt-2 text-sm font-medium text-white">${proposal.providerStake} mockUSDC</p>
+        <div className="mt-4 border border-white bg-black px-3 py-1 text-xs font-mono font-bold uppercase tracking-widest inline-block shadow-[4px_4px_0px_0px_var(--brut-red)] text-brut-red">
+          [{proposal.serviceType.replaceAll("_", " ")}]
         </div>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-        <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Why the agent chose this route</p>
-        <ul className="mt-3 space-y-2 text-sm text-slate-200">
+      <p className="text-sm font-mono leading-relaxed text-white/80 uppercase">{proposal.summary}</p>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        <div className="border border-white bg-black p-4 relative hover:-translate-y-1 transition-transform">
+          <div className="absolute top-0 left-0 w-full h-1 bg-brut-red"></div>
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-white/60">Provider</p>
+          <p className="mt-2 text-sm font-mono font-bold text-white uppercase">{proposal.providerName}</p>
+        </div>
+        <div className="border border-white bg-black p-4 relative hover:-translate-y-1 transition-transform">
+          <div className="absolute top-0 left-0 w-full h-1 bg-white"></div>
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-white/60">Escrow</p>
+          <p className="mt-2 text-sm font-mono font-bold text-white uppercase">${proposal.paymentAmount} MOCK_USDC</p>
+        </div>
+        <div className="border border-white bg-black p-4 relative hover:-translate-y-1 transition-transform">
+          <div className="absolute top-0 left-0 w-full h-1 bg-brut-red"></div>
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-white/60">Provider Stake</p>
+          <p className="mt-2 text-sm font-mono font-bold text-white uppercase">${proposal.providerStake} MOCK_USDC</p>
+        </div>
+      </div>
+
+      <div className="mt-6 border border-white bg-black p-4">
+        <p className="text-xs font-black uppercase tracking-[0.25em] text-white/60 border-b border-white/20 pb-2 mb-3">AGENT_RATIONALE</p>
+        <ul className="space-y-3 text-sm font-mono text-white/90">
           {proposal.rationale.map((item) => (
-            <li key={item} className="flex gap-2">
-              <span className="text-cyan-300">+</span>
-              <span>{item}</span>
+            <li key={item} className="flex gap-3 uppercase items-start">
+              <span className="text-brut-red font-black mt-0.5">&gt;</span>
+              <span className="leading-tight">{item}</span>
             </li>
           ))}
         </ul>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-3">
+      <div className="mt-8 flex flex-wrap gap-4">
         <button
           type="button"
           disabled={busy}
           onClick={onApprove}
-          className="rounded-full bg-cyan-300 px-5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+          className="brutalist-button !bg-white !text-black !border-white hover:!bg-black hover:!text-white disabled:cursor-not-allowed disabled:opacity-60 shadow-[6px_6px_0px_0px_var(--brut-red)] hover:shadow-[6px_6px_0px_0px_var(--brut-red)]"
         >
-          {busy ? "Funding escrow..." : "Approve and fund order"}
+          {busy ? "FUNDING_ESCROW..." : "APPROVE_AND_FUND"}
         </button>
         <button
           type="button"
           disabled={busy}
           onClick={onReject}
-          className="rounded-full border border-white/12 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/6 disabled:cursor-not-allowed disabled:opacity-60"
+          className="brutalist-button-outline disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Reject
+          REJECT_PROPOSAL
         </button>
       </div>
     </section>

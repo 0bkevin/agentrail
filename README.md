@@ -127,10 +127,12 @@ Required (minimum meaningful setup):
   - `AGENTRAIL_ARBITER_ADDRESS`
 - Database
   - `DATABASE_URL` or `NEON_DATABASE_URL`
-- Service signers + service URLs
+- Service signers
   - `PROVIDER_API_PRIVATE_KEY`
   - `DEVICE_SIM_PRIVATE_KEY`
   - `HUMAN_SOLVER_PRIVATE_KEY`
+
+Optional external service URLs (only if you run services outside this Next.js app):
   - `NEXT_PUBLIC_PROVIDER_API_URL`
   - `NEXT_PUBLIC_DEVICE_SIM_URL`
   - `NEXT_PUBLIC_PROOF_VERIFIER_URL`
@@ -170,16 +172,12 @@ Configure verifier/resolver roles:
 pnpm contracts:configure:roles:sepolia
 ```
 
-## Service commands (manual mode)
+## Runtime commands
 
-If you do not use `pnpm demo:up`, run components manually:
+Run the app and (optionally) the event sync worker:
 
 ```bash
 pnpm dev
-pnpm service:provider-api
-pnpm service:device-sim
-pnpm service:proof-verifier
-pnpm service:human-solver
 pnpm worker:sync
 ```
 
@@ -194,11 +192,11 @@ App API:
 - `GET /api/orders/:id`
 - `POST /api/sync/escrow-events`
 
-Service API:
-- `POST /v1/company-enrichment` (provider API)
-- `POST /device/execute` (device simulator)
-- `POST /v1/verify-and-start` (proof verifier)
-- `POST /v1/human-task` (human solver)
+Integrated service API (Next.js Route Handlers):
+- `POST /api/provider/v1/company-enrichment` (provider API)
+- `POST /api/device/device/execute` (device simulator)
+- `POST /api/verifier/v1/verify-and-start` (proof verifier)
+- `POST /api/human/v1/human-task` (human solver)
 
 ## Source of truth and data model
 

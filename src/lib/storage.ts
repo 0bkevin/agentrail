@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import { Pool, neonConfig } from "@neondatabase/serverless";
-import ws from "ws";
 
 import type { AgentProposal, Order, TerminalEntry } from "@/lib/agentrail-types";
 
-neonConfig.webSocketConstructor = ws;
+neonConfig.poolQueryViaFetch = true;
 
 type StoredChallenge = {
   address: string;

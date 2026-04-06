@@ -12,9 +12,15 @@ createAppKit({
   networks,
   projectId,
   metadata,
+  enableWallets: true,
+  defaultAccountTypes: {
+    eip155: "eoa",
+  },
+  coinbasePreference: "eoaOnly",
   features: {
     analytics: true,
     email: false,
+    socials: false,
   },
 });
 

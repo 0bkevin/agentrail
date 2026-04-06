@@ -405,8 +405,13 @@ class NeonStorage implements AgentRailStorage {
   async initialize() {
     if (!this.initPromise) {
       this.initPromise = (async () => {
-        for (const statement of schemaStatements) {
-          await this.pool.query(statement);
+        await this.pool.query("select pg_advisory_lock(hashtext('agentrail_schema_migration_lock'))");
+        try {
+          for (const statement of schemaStatements) {
+            await this.pool.query(statement);
+          }
+        } finally {
+          await this.pool.query("select pg_advisory_unlock(hashtext('agentrail_schema_migration_lock'))");
         }
       })();
     }
